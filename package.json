@@ -1,0 +1,16 @@
+{
+  "name": "e2e-bnp-tests",
+  "version": "1.0.0",
+  "description": "E2E tests",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bluebird": "^3.5.1",
+    "puppeteer": "^1.5.0"
+  }
+}
