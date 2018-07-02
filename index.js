@@ -16,6 +16,21 @@ var bnp = {
     }
 }
 
+var supplier = {
+    suppliers: {
+        'main': {
+            email: 'daniil.naumetc@gmail.com',
+            company: 'daniilcorp',
+            'First Name': 'Daniil',
+            'Last Name': 'Naumetc'
+        }
+    },
+    give: function(who){
+        if (who) return this.suppliers[who]
+        return this.suppliers['main']
+    }
+}
+
 const authPage = {
     loginSelector: `input[name='login']`,
     passwordSelector: `input[name='password']`,
@@ -43,6 +58,10 @@ const createCampaign = {
     },
     page2: {
         continue: '#inchannelSelection > div:nth-child(3) > button:nth-child(2)'
+    },
+    page3: {
+        waitFor: '#contacts > h1:nth-child(1)',
+        add: 'button.pull-left:nth-child(1)'
     }
 }
 
@@ -57,6 +76,11 @@ const keychain = {
     }
 }
 
+const options = {
+    width: 1300,
+    height: 900
+}
+
 
 
 var main = async () => {
@@ -64,10 +88,17 @@ var main = async () => {
 
     const browser = await pupp.launch({
         headless: false,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            `--window-size=${options.width},${options.height}`,
+            // '--start-maximized',
+            // '--start-fullscreen'
+        ],
     });
 
     const page = await browser.newPage();
+    page.setViewport(options)
     // pageOnce = Promise.promisify(page.once);
 
     await page.goto(bnp.url('onboarding')); // open bnp
@@ -121,7 +152,7 @@ var main = async () => {
     }
 
     var fillPage1 = async (campaignId, genericCampaign) => {
-        await page.waitFor(5000);
+        await page.waitFor(2500);
         await page.waitForSelector(createCampaign.page1.campaignIdSelector)
         await page.type(createCampaign.page1.campaignIdSelector, campaignId)
         await page.type(createCampaign.page1.descriptionSelector, 'random smth')
@@ -160,10 +191,30 @@ var main = async () => {
         return true
     }
 
+    var fillPage3 = async (contacts) => {
+        await page.waitFor(1000);
+        await page.waitForSelector(createCampaign.page3.waitFor)
+
+        for(const contact of contacts) {
+            await page.click(createCampaign.page3.add)
+            // await page.$eval('for (const i of document.getElementsByClassName('form-horizontal')) {if (i.innerText.includes('VATIN')) {console.log(i.innerText)}}')
+            var lol = await page.evaluate('.form-horizontal', selector => {
+                for (const i of document.getElementsByClassName(selector)) {if (i.innerText.includes('VATIN')) {return Promise.resolve(i.innerText)}}
+            }, 'form-horizontal')
+
+            console.log('lol===>', lol);
+        }
+        
+        // await page.click(createCampaign.page2.continue)
+
+        return true
+    }
+
     await tryCatcher('Login', login, keychain.testCustomer.email, keychain.testCustomer.password);
     await tryCatcher('Open create campaign', openCreateCampaign)
     await tryCatcher('Fill page 1', fillPage1, campaign.id + ((Math.random()*1000)|1).toString(), false)
     await tryCatcher('Fill page 2', fillPage2, [{toClick:'Invoice Sending', inside:['E-invoice']}, {toClick:'Catalog Provision'}])
+    await tryCatcher('Fill page 3', fillPage3, [supplier.give()])
 
 
     // await tryCatcher('Language change', langChange, 'Englisch')
