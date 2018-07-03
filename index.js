@@ -21,8 +21,14 @@ var supplier = {
         'main': {
             email: 'daniil.naumetc@gmail.com',
             company: 'daniilcorp',
-            'First Name': 'Daniil',
-            'Last Name': 'Naumetc'
+            firstName: 'Daniil',
+            lastName: 'Naumetc'
+        },
+        'extra': {
+            email: 'nullpvndv@gmail.com',
+            company: 'pvndvcorp',
+            firstName: 'Kek',
+            lastName: 'Lolovic'
         }
     },
     give: function(who){
@@ -60,8 +66,34 @@ const createCampaign = {
         continue: '#inchannelSelection > div:nth-child(3) > button:nth-child(2)'
     },
     page3: {
-        waitFor: '#contacts > h1:nth-child(1)',
-        add: 'button.pull-left:nth-child(1)'
+        waitFor: {
+            page: '#contacts > h1:nth-child(1)',
+            add: '.contact-list > div:nth-child(3) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > h4:nth-child(2)'
+        },
+        add: 'button.pull-left:nth-child(1)',
+        save: '#contacts_list > div.contact-list > div.modal.fade.in > div > div > div.modal-footer > button.btn.btn-primary',
+        continue: '#contacts_list > div:nth-child(2) > button:nth-child(2)',
+        contactFields: {
+            email: '.contact-list > div:nth-child(3) > div:nth-child(1) > div:nth-child(1) > div:nth-child(2) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(2) > input:nth-child(1)',
+            company: '.contact-list > div:nth-child(3) > div:nth-child(1) > div:nth-child(1) > div:nth-child(2) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(3) > div:nth-child(2) > input:nth-child(1)',
+            firstName: '.contact-list > div:nth-child(3) > div:nth-child(1) > div:nth-child(1) > div:nth-child(2) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(4) > div:nth-child(2) > input:nth-child(1)',
+            lastName: '.contact-list > div:nth-child(3) > div:nth-child(1) > div:nth-child(1) > div:nth-child(2) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(5) > div:nth-child(2) > input:nth-child(1)'
+        }
+    },
+    page4: {
+        waitFor: '#emailTemplate > h1:nth-child(1)',
+        radios: "(//div[@id='emailTemplate']//div[contains(@class, 'template-preview')]//label)",
+        continue: '#emailTemplate > div.form-submit.text-right > button:nth-child(3)'
+    },
+    page5: {
+        waitFor: '#landingpageTemplate > h1:nth-child(1)',
+        radios: "(//div[@id='landingpageTemplate']//div[contains(@class, 'template-preview')]//label)",
+        continue: '#landingpageTemplate > div:nth-child(3) > button:nth-child(3)'
+    },
+    page6: {
+        waitFor: '#overview > h1',
+        startCampaign: '#overview > div.form-submit.text-right > button.btn.btn-primary',
+        confirm: '#overview > div.overview > div.modal.fade.in > div > div > div.modal-footer > button.btn.btn-primary'
     }
 }
 
@@ -78,9 +110,14 @@ const keychain = {
 
 const options = {
     width: 1300,
-    height: 900
+    height: 850
 }
 
+async function asyncForEach(array, callback) {
+    for (let index = 0; index < array.length; index++) {
+      await callback(array[index], index, array)
+    }
+}
 
 
 var main = async () => {
@@ -193,28 +230,71 @@ var main = async () => {
 
     var fillPage3 = async (contacts) => {
         await page.waitFor(1000);
-        await page.waitForSelector(createCampaign.page3.waitFor)
+        await page.waitForSelector(createCampaign.page3.waitFor.page)
 
-        for(const contact of contacts) {
+        await asyncForEach(contacts, async (contact) => {
             await page.click(createCampaign.page3.add)
-            // await page.$eval('for (const i of document.getElementsByClassName('form-horizontal')) {if (i.innerText.includes('VATIN')) {console.log(i.innerText)}}')
-            var lol = await page.evaluate('.form-horizontal', selector => {
-                for (const i of document.getElementsByClassName(selector)) {if (i.innerText.includes('VATIN')) {return Promise.resolve(i.innerText)}}
-            }, 'form-horizontal')
+            await page.waitForSelector(createCampaign.page3.waitFor.add)
+            await page.waitFor(1000);
 
-            console.log('lol===>', lol);
-        }
+
+            asyncForEach(Object.keys(contact), async (fieldName) => {
+                console.log(`Filling ${fieldName} with '${contact[fieldName]}'`)
+                await page.type(createCampaign.page3.contactFields[fieldName], contact[fieldName])
+            })
+
+            await page.waitFor(2000);
+            await page.click(createCampaign.page3.save)
+            await page.waitFor(1000);
+        })
+        await page.waitFor(2000);
         
-        // await page.click(createCampaign.page2.continue)
+        await page.click(createCampaign.page3.continue)
 
         return true
     }
+
+    var fillPage4 = async (templateN) => {
+        await page.waitFor(1000);
+        await page.waitForSelector(createCampaign.page4.waitFor)
+        var rad = await page.$x(createCampaign.page4.radios)
+        await rad[templateN].click()
+        await page.waitFor(500);
+        await page.click(createCampaign.page4.continue)
+
+        return true
+    }
+
+    var fillPage5 = async (templateN) => {
+        await page.waitFor(1000);
+        await page.waitForSelector(createCampaign.page5.waitFor)
+        var rad = await page.$x(createCampaign.page5.radios)
+        await rad[templateN].click()
+        await page.waitFor(500);
+        await page.click(createCampaign.page5.continue)
+
+        return true
+    }
+
+    var fillPage6 = async () => {
+        await page.waitFor(1000);
+        await page.waitForSelector(createCampaign.page6.waitFor)
+        await page.click(createCampaign.page6.startCampaign)
+        await page.waitFor(500);
+        await page.click(createCampaign.page6.confirm)
+
+        return true
+    }
+
 
     await tryCatcher('Login', login, keychain.testCustomer.email, keychain.testCustomer.password);
     await tryCatcher('Open create campaign', openCreateCampaign)
     await tryCatcher('Fill page 1', fillPage1, campaign.id + ((Math.random()*1000)|1).toString(), false)
     await tryCatcher('Fill page 2', fillPage2, [{toClick:'Invoice Sending', inside:['E-invoice']}, {toClick:'Catalog Provision'}])
-    await tryCatcher('Fill page 3', fillPage3, [supplier.give()])
+    await tryCatcher('Fill page 3', fillPage3, [supplier.give('main'), supplier.give('extra')])
+    await tryCatcher('Fill page 4', fillPage4, 0)
+    await tryCatcher('Fill page 5', fillPage5, 0)
+    await tryCatcher('Fill page 6 - Start campaign', fillPage6)
 
 
     // await tryCatcher('Language change', langChange, 'Englisch')
