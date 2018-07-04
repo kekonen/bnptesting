@@ -75,58 +75,14 @@ console.log(`
 var lol = ''
 
 async function main() {
-    lol= await request.get(eproc.uri('opc'))
+    lol = await request.get(eproc.uri('opc'))
 
     
-    // var optionsOne = {
-    //     uri: eproc.uri('opc'),
-    //     method: 'GET',
-    //     followAllRedirects: false,
-    //     followRedirect: false,
-    //     transform: redirectOn302
-    // }
-
-    // const loginPage = await request.get(optionsOne)
-    // var promiseAnswer = request(optionsOne)//.auth(eproc.login,eproc.pass, false)
-    // lol = promiseAnswer
-    // // console.log(lol)
-    // var answerBody = await promiseAnswer;
-    // console.log(promiseAnswer);
-    // var SSOArtID = promiseAnswer.uri.query.substring(9);
-
-
-    // let cookieX = new tough.Cookie({
-    //     key: "some_key",
-    //     value: "some_value",
-    //     domain: eproc.domain(),
-    //     httpOnly: true,
-    //     maxAge: 31536000
-    // });
-    // var cookiejar = request.jar();
-    // cookiejar.setCookie(cookieX, eproc.uri());
-    //             // var mycookie = ``;
-    //             // var j = req.jar();
-    //             // var urlX = eproc.uri('opc');
-    //             // var cookieX = req.cookie("" + mycookie);
-    //             // j.setCookie(cookie, urlX);
-
-    // var optionsTwo = {
-    //     uri: `https://eproc.opuscapita.com/josso/IDBUS-UI/IDP/SSO/LOGIN/SIMPLE?-1.IFormSubmitListener-signIn-signInForm&SSOArt=id${SSOArtID}`,
-    //     method: 'POST',
-    //     jar: cookiejar
-
-    // }
-
-    // console.log(loginPage)
     return true
 }
 
 (async () => await main())()
 
-// const loginPage = await request.get(optionsOne)
 
 
 
-
-// var lol = 'kek'
-// (async () => {lol = request.get(eproc.uri('opc'))})()
