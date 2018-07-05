@@ -1,0 +1,2938 @@
+<!DOCTYPE html>
+
+
+  <html>
+    <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>
+        Checkout
+      </title>
+      <link rel="shortcut icon" type="image/x-icon"
+            href="/opc/static/W25Ofwen6qc5V1HATaTMrTF3cY9Te4qrcIvDGkPh0iS.ico">
+      <script src="/opc/static/t5OGphSUjwdNOoxNKgdRTTh1RBtmzhMXxHDYYeR4lYj.js" type="text/javascript" ></script>
+<script src="/opc/static/AWvUacu7YfDZfW5B8lnyhCulRjRKZTsUrjHGVZZCAvZ.js" type="text/javascript" ></script>
+<script src="/opc/static/AV4bWNiFwDpUGU7yLFgA5gfJrfexq3ewfukOj2yvbTB.js" type="text/javascript" ></script>
+
+
+
+
+
+
+
+<link href="/opc/static/6SqAl9vMUWf5q0ogwZQnNADDHDhHRuh0oFAgnvPK3fB.css" type="text/css" rel="stylesheet" media="screen, projection" />
+<link href="/opc/static/JJ2SxIYEZG84VQDuAhqSZ9VsMaoT2F3qO5SlAqc3loK.css" type="text/css" rel="stylesheet" media="screen, projection, print" />
+<script src="/opc/static/0l8YALavrZRFJs4OBu1GMY2fUkf5cdZhxrLVayhrdmm.js" type="text/javascript" ></script>
+<script src="/opc/static/XIuXfjIj4YAPcXaBu9pb06ASz7XVkFjJ1GRIG88KJ0k.js" type="text/javascript" ></script>
+<script type="text/javascript">
+        var currentLanguage = "en";
+        var currentCountry = "";
+        
+        var datePattern = "MM/dd/yyyy";
+        var contextPath = "/opc";
+
+        function removeDialog(popupContainerId) {
+          var containerId = "popupContainer";
+          if(popupContainerId) {
+             containerId = popupContainerId
+          }
+          var popupContainer = jQuery("#" + containerId);
+
+          popupContainer.modal('hide');
+          popupContainer.removeData('bs.modal');
+        }
+
+        function showPopupContainerDialog(url, popupContainerId, modalDialogOnShownCallbackFunction) {
+          var containerId = "popupContainer";
+          if(popupContainerId) {
+             containerId = popupContainerId
+          }
+          var popupContainer = jQuery("#" + containerId);
+
+          popupContainer.load(url, null, function() {
+                    popupContainer.modal();
+                    if (modalDialogOnShownCallbackFunction) {
+                        popupContainer.on('shown.bs.modal', modalDialogOnShownCallbackFunction);
+                    }
+                    jQuery("#" + containerId + " #cancelButton").on("click", function() {
+                        // Need for correct call of removeDialog function, without passing event into parameters.
+                        removeDialog(popupContainerId);
+                    });
+                  }
+          );
+        }
+
+         function applyForSelectedItemsCallback() {
+            if (!isProductInShoppingCartSelected()) {
+                $("#applyForSelectedItems").prop('disabled', true);
+            }
+         };
+
+         function getSelectedItemsJoinedIds() {
+            var selectedItemsIds = [];
+            $("input[name=selectItem]:checked").each(function (idx, item) {
+                selectedItemsIds.push(item.value);
+            });
+            return selectedItemsIds.join(",");
+        }
+
+        function showTemplateSelectionDialog(productKey, quantitySelectorId, errorContainerId, spinnerContainerId, isFromProductDetails) {
+          showProcessingMessage(spinnerContainerId, "Creating RfQ for product...");
+
+          $.ajax({
+            url: "\u002fopc\u002frfqCommunication\u002frfqTemplates",
+            cache: false,
+            success: function (data) {
+              var popupContainer = jQuery("#popupContainer");
+              popupContainer.html(data);
+              popupContainer.modal();
+              popupContainer.find('#confirmButton').on("click",
+              { productKey: productKey, quantitySelectorId: quantitySelectorId, errorContainerId: errorContainerId, spinnerContainerId: spinnerContainerId, isFromProductDetails: isFromProductDetails },
+              createRfqFromTemplate);
+              popupContainer.find('#cancelButton').on("click", { spinnerId: spinnerContainerId }, removeDialogWithHideSpinner);
+            }
+          });
+        }
+
+        function createRfqFromTemplate(event) {
+          createRfq(event.data.productKey, event.data.quantitySelectorId, event.data.errorContainerId, event.data.spinnerContainerId, event.data.isFromProductDetails);
+        }
+
+        function createRfq(productKey, quantitySelectorId, errorContainerId, spinnerContainerId, isFromProductDetails) {
+          // escape special characters in jQuery selectors
+          var escapeQuantitySelectorId = escapeJQuerySelector(quantitySelectorId);
+          var quantity = $("#" + escapeQuantitySelectorId).val();
+          var rfqTemplateId = '';
+          var rfqFromRfqTemplateForm = jQuery('#rfqFromRfqTemplateForm');
+          if(rfqFromRfqTemplateForm.length) {
+            if (rfqFromRfqTemplateForm.find('#createRfqFromRfqTemplateRadio').is(':checked')) {
+              rfqTemplateId = rfqFromRfqTemplateForm.find('#rfqTemplateId').val();
+            }
+          }
+
+          var data;
+          if (isFromProductDetails) {
+              var container = escapeJQuerySelector('productDetailsContent');
+              var key = escapeJQuerySelector(productKey);
+              var productFormSelector = jQuery('#' + container).find('#productForm_' + key);
+              data = productFormSelector.serialize();
+              data += "&isFromProductDetails=true";
+              data += "&rfqTemplateId=" + rfqTemplateId;
+          } else {
+              data = {
+                  productKey: productKey,
+                  quantity: quantity,
+                  rfqTemplateId: rfqTemplateId
+                }
+          }
+
+          $.ajax({
+            type: 'POST',
+            url: "\u002fopc\u002frfqCommunication\u002fcreateRfq",
+            data: data,
+            success: function (data) {
+              if(data.errorMsg) {
+                if(rfqFromRfqTemplateForm.length) {
+                  rfqFromRfqTemplateForm.parent().find(".bs-callout.bs-callout-danger").remove();
+                  $('<div class="bs-callout bs-callout-danger"><p>' + data.errorMsg + '</p></div>').insertBefore(rfqFromRfqTemplateForm);
+                } else {
+                  var errorContainerSelector = $("#" + errorContainerId);
+                  errorContainerSelector.empty();
+                  errorContainerSelector.append(data.errorMsg);
+                  errorContainerSelector.show();
+                }
+              } else {
+                removeDialog();
+                if (window.clearDirtyInputForRelatedProduct) {
+                  window.clearDirtyInputForRelatedProduct('form:dirty');
+                }
+                $('<form></form>').attr('action', data.redirectUrl).appendTo('body').submit();
+              }
+            }
+          });
+        }
+
+        function refreshCartInfo(spinnerId) {
+          refreshCart('/opc/shoppingCart/retrieveItemsCountInCart', spinnerId)
+        }
+
+        function doPostBack(data, url, successHandler, errorHandler, beforeSend, onComplete) {
+          if (!successHandler) {
+            successHandler = updatePopupContainer;
+          }
+          jQuery.ajax({type:'POST', data: data, url: url, beforeSend: beforeSend, success: successHandler, error: errorHandler, complete: onComplete});
+        }
+
+        function updatePopupContainer(data) {
+          removeDialog();
+          jQuery('#popupContainer').html(data);
+        }
+
+        // Show processing messages (start, finish, error)
+        function showProcessingMessage(messageContainerId, message) {
+          jQuery('#' + messageContainerId).stop(true, true).text(message).animate({opacity: 'show'}, 100);
+        }
+
+        function showProcessingFinishedMessage(messageContainerId, message) {
+          jQuery('#' + messageContainerId).stop(true, true).show().text(message).animate({opacity: 'hide'}, 5000);
+          gridCellEqualizer();
+        }
+
+        function showProcessingError(messageContainerId, message) {
+          jQuery('#' + messageContainerId).stop(true, true).show().text(message);
+          gridCellEqualizer();
+        }
+
+        function hideProcessingMessage(messageContainerId) {
+          jQuery('#' + messageContainerId).stop(true, true).show().animate({opacity: 'hide'}, 3000);
+        }
+
+        // Hide all hideable errors in the container
+        function hideErrors(containerId) {
+          var selector = " .error.hideable, .label.label-danger, .bs-callout.bs-callout-danger";
+          var container = null;
+          if (containerId) {
+            container = jQuery('#' + containerId);
+          }
+          jQuery(selector, container).hide();
+
+          jQuery(" .has-error", container).removeClass("has-error");
+        }
+
+        function escapeJQuerySelector(selector) {
+          return selector.replace(/[!"#$%&'()*+,.\/:;<=>?@[\\\]^`{|}~]/g, '\\$&');
+        }
+
+        openConfirmDialog.defaultConfirmButtonText = "Ok";
+        openConfirmDialog.defaultCancelButtonText = "Cancel";
+
+        // Confirm adding to cart
+        function confirmAddToCart(topContainerId, productKey, postBackUrl) {
+              // escape special characters in jQuery selectors
+              var container = escapeJQuerySelector(topContainerId);
+              var key = escapeJQuerySelector(productKey);
+
+              hideErrors(container);
+              showProcessingMessage(container + " #spinner_" + key, "Adding selected products to cart...");
+
+              var productFormSelector = jQuery('#' + container).find('#productForm_' + key);
+              var data = productFormSelector.serialize();
+              doPostBack(data, postBackUrl, function(data, textStatus, jqXHR ) {
+                                              if (!jqXHR.getResponseHeader('X-OPC')) {
+                                                showErrorWhenSessionExpired(key);
+                                              } else {
+                                                $(productFormSelector).trigger("ajaxAddToCartSuccess");
+                                                updatePopupContainer(data);
+                                              }
+                                          }, function () {
+                                              showErrorWhenSessionExpired(key);
+                                          }
+                          );
+        }
+
+        function showErrorWhenSessionExpired(productKey) {
+          removeDialog();
+          showProcessingFinishedMessage("spinner_" + productKey, "");
+          showProcessingError("error_" + productKey, "Communication with server failed. Try to reload current page in browser.");
+        }
+
+        // Show select shopping list dialog
+        function showSelectShoppingListDialog(topContainerId, productKey, postBackUrl) {
+              // escape special characters in jQuery selectors
+              var container = escapeJQuerySelector(topContainerId);
+              var key = escapeJQuerySelector(productKey);
+
+              hideErrors(container);
+              var spinnerId = "spinner_" + key;
+              showProcessingMessage(spinnerId, "Adding selected products to shopping list...");
+              var productFormSelector = jQuery('#' + container).find('#productForm_' + key);
+              var data = productFormSelector.serialize();
+              // should use productKey instead key.
+              loadAndOpenShoppingListSelectionDialog(spinnerId, productFormSelector, postBackUrl, data);
+        }
+
+        function openConfirmDialogAndContinue(productKeys, resumeHandler) {
+          var messages = prepareMessagesForConfirm(productKeys);
+          if (messages) {
+              openConfirmDialog({
+                  title: "Important message",
+                  message: messages,
+                  buttons: {
+                      confirm: {
+                          handler: resumeHandler
+                      }
+                  }
+              });
+          } else {
+              resumeHandler();
+          }
+        }
+
+        function loadAndOpenShoppingListSelectionDialog(spinnerId, productFormSelector, postBackUrl, serializedProductData) {
+          jQuery("#popupContainer").load("/opc/shoppingList/selectList", null, function() {
+            var self = this;
+            jQuery(self).modal();
+
+            jQuery(self).on('hidden.bs.modal', function(){jQuery("#cancelButton", self).click();});
+            jQuery("#addToListButton", self).on("click", {spinnerId: spinnerId, productFormSelector: productFormSelector,
+                                                        serializedProductData: serializedProductData, postBackUrl: postBackUrl}, confirmAddToList);
+            jQuery("#cancelButton", self).on("click", {spinnerId: spinnerId}, removeDialogWithHideSpinner);
+          });
+        }
+
+        // Confirm adding to shopping list
+        function confirmAddToList(event) {
+
+          if (applyShoppingListSelection()) { // This method is defined in the shopping list selection dialog
+            hideErrors();
+            var data = jQuery("#shoppingListSelectionForm").serialize() + '&' + event.data.serializedProductData
+                + '&' + jQuery.param({spinnerId: event.data.spinnerId});
+            doPostBack(data, event.data.postBackUrl, function(data) {
+                                                $(event.data.productFormSelector).trigger("ajaxAddToListSuccess");
+                                                updatePopupContainer(data);
+                                             }
+                       );
+            removeDialog();
+          }
+        }
+
+
+        function removeDialogWithHideSpinner(event) {
+          hideProcessingMessage(event.data.spinnerId);
+          removeDialog();
+        }
+
+        jQuery(document).ready(function () {
+          $('body').on('shown.bs.modal', function ()  {
+            $('.modal-footer .btn.btn-primary').focus();
+          });
+
+          // Current script resolve conflict between JQuery buttons and Bootstrap buttons (reproduced in automotive and in shopping cart)
+          $('body').on('click', '[data-toggle=toggleButtons] label', function (event) {
+            if ($(event.target).is('input')) {
+              var checkbox = $(this).find('input[type="checkbox"]');
+              if (checkbox.is(':checked')) {
+                checkbox.closest('.btn').addClass('active')
+              } else {
+                checkbox.closest('.btn').removeClass('active')
+              }
+
+              var radio = $(this).find('input');
+              if (radio.is(':checked')) {
+                radio.closest('[data-toggle=toggleButtons]').find('.btn').removeClass('active');
+                radio.closest('.btn').addClass('active');
+              }
+            }
+          });
+          
+          
+        });
+      </script>
+
+      
+      
+
+      
+      
+
+
+
+
+      
+      
+      <style>
+        [data-toggle="toggleButtons"] > .btn > input[type="radio"], [data-toggle="toggleButtons"] > .btn > input[type="checkbox"] {
+          display: none;
+        }
+      </style>
+      
+
+      
+      <link rel="shortcut icon" type="image/x-icon" href="/opc/static/W25Ofwen6qc5V1HATaTMrTF3cY9Te4qrcIvDGkPh0iS.ico">
+
+      
+
+      
+      
+      
+
+      
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+  <meta name="layout" content="bootstrap/bootstrapMain"/>
+  
+
+    
+    
+    </head>
+
+    <body>
+
+      
+
+      
+      
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+        
+        
+        
+    
+
+
+
+
+
+
+
+
+
+    
+        
+    
+
+    
+        
+    
+
+
+
+
+
+    
+        
+            
+        
+    
+    
+        
+            
+        
+    
+
+
+
+
+    
+        
+    
+    
+        
+    
+    
+        
+            
+        
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+    
+        
+            
+        
+    
+
+
+
+
+
+    
+
+
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+        
+            
+        
+    
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+<script type="application/javascript">
+    (function(jQuery) {
+        function DynamicMenu(url) {
+            var spiiner = '<span id="spinnerShoppingListMenu" class="spinner"\n' +
+                '                    style="margin-left: -7px;position:relative;top:-2px; left: 50%">\n' +
+                '                <i class="fa fa-spinner fa-spin"></i>\n' +
+                '              </span>'
+
+            this.menuItems = [{content: spiiner}];
+
+            var self = this;
+            var contentLoaded = function (menuItems) {
+                self.menuItems = menuItems;
+            };
+
+            this.getMenuItems = function(eventId) {
+                if (self.lastEventId !== eventId) {
+                    self.lastEventId = eventId;
+                    self.menuItems = [{content: spiiner}];
+
+                    $.ajax({
+                        type: 'POST',
+                        url: url,
+                        data: {
+                            max: 5,
+                            sort: "changedOn",
+                            order: "desc"
+                        },
+                        success: function (menuItems, textStatus, jqXHR) {
+                            if (!jqXHR.getResponseHeader('X-OPC')) {
+                                contentLoaded([{
+                                    content: '<div style="width: 220px;padding: 4px 14px;">Unable to load shopping list.</div>'
+                                }]);
+                            } else {
+                                contentLoaded(menuItems);
+                            }
+                        }
+                    });
+                }
+
+                return this.menuItems;
+            };
+        }
+
+        window.menuState = new DynamicMenu('/opc/shoppingList/showShoppingListsMenu');
+    })($);
+</script>
+
+
+    
+
+    
+        
+    
+
+    
+    
+        
+        
+        
+        
+            
+        
+        <script>
+            
+                var shoppingCartItemsCount = 1;
+            
+        </script>
+
+        
+            
+        
+    
+
+
+    
+    
+        
+            
+            
+        
+    
+
+    
+
+
+
+
+
+
+
+
+
+    
+        
+            
+            
+                
+            
+
+            
+        
+    
+
+
+
+
+
+
+
+
+
+
+
+
+<header class="oc-menu oc-menu--minimized oc-menu--opuscapita-dark-theme">
+    <div class="oc-menu__left-col">
+        <div class="oc-menu-logo">
+    <a href="https://p2p.opuscapita.com/opc" class="oc-menu-logo__link">
+        
+            <div class="oc-menu-logo__image">
+                <svg version="1.1" id="Ebene_1" xmlns="http://www.w3.org/2000/svg" x="0px" y="0px"
+     viewBox="0 0 473.4 85" style="enable-background:new 0 0 473.4 85;" xml:space="preserve">
+    <style type="text/css">
+    .st0 {
+        fill: #FFFFFF;
+    }
+    </style>
+    <g id="XMLID_2_">
+        <path id="XMLID_25_" class="st0" d="M34.5,9.5c11.1,0,13.7,2.5,9.8,22.8C40.5,52.8,37,55.2,25.9,55.2c-11.4,0-13.8-2.5-9.9-22.9
+    C19.8,12,23.1,9.5,34.5,9.5 M24,64.9c23.7,0,29.3-10.1,33.5-32.7C61.8,9.8,59.9-0.1,36.3-0.1C12.6-0.1,6.9,9.8,2.7,32.2
+    C-1.5,54.8,0.4,64.9,24,64.9"/>
+        <path id="XMLID_24_" class="st0" d="M148,46.8c-1.4,7.2-2.9,8.2-10.5,8.2c-7.7,0-9.1-1-7.7-8.2l5.2-27.6c0.1-0.6-0.4-1.2-1.4-1.2
+    h-9.5c-1,0-1.7,0.5-1.8,1.2l-5.4,28.6c-1.9,10.2,0.3,16.3,19,16.3c18.6,0,23-6.1,24.9-16.3l5.4-28.6c0.1-0.6-0.2-1.2-1.4-1.2H155
+    c-1.3,0-1.7,0.5-1.8,1.2L148,46.8z"/>
+        <path id="XMLID_23_" class="st0" d="M194,26c6.3,0,8.8,0.7,10.8,0.7c1.4,0,2-0.5,2.1-1.6l0.8-4.1c0.5-2.7-1.1-3.6-13.7-3.6
+    c-14.3,0-20,2.8-21.8,12.5c-1.6,8.5,3.1,10.4,8.4,12.6l5.9,2.4c4.4,1.8,5.9,2.3,5.3,5.5c-0.7,3.5-2.7,4.7-9.8,4.7
+    c-7.3,0-11.1-1-12.6-1c-0.8,0-1.5,0.4-1.6,1.1l-0.9,4.9c-0.4,1.9-0.2,2.5,1.2,3c1.8,0.7,6.9,1.1,12.8,1.1c16,0,21.9-4.9,23.7-14.4
+    c1.4-7.7-1.6-9.6-6.8-11.8l-6.5-2.6c-5.1-2.1-7.1-2.5-6.5-5.4C185.4,26.7,187.5,26,194,26"/>
+        <path id="XMLID_20_" class="st0" d="M91.1,17.6c-10.2,0-15.5,1.8-19.2,4.7c-3.7,2.9-5.5,7.8-7.4,17.6l-8.1,42.8
+    c-0.1,0.6,0.2,1.2,1.4,1.2h9.5c1.3,0,1.7-0.5,1.8-1.2l3.6-19.2c0.1-0.4,0.3-0.5,0.8-0.5c1.4,0,2.9,1.3,10.7,1.3
+    c13.1,0,22-5.4,25.5-23.8C113,23.2,110,17.6,91.1,17.6 M96.5,40.5c-2.2,11.4-5.3,14.6-12.3,14.6c-3.5,0-6.4-0.4-7.6-1.6
+    c-1.3-1.4-1.1-4.6,0.3-11.9c1.2-6.3,2.2-10.9,4.1-12.5c1.8-1.6,4.7-2.2,8.5-2.2C96.5,26.8,98.6,29.1,96.5,40.5"/>
+        <path id="XMLID_19_" class="st0" d="M241.6,55.7c-12.9,0-16.9-3-13.1-23.4c3.8-20.3,9.3-23.1,22.2-23.1c4.3,0,12.7,0.9,12.7,0.9
+    c0.8,0,1.5-0.5,1.6-1l1.1-6c0.2-1.1-0.2-1.8-1.6-2.1c-2.4-0.5-6.4-1-13.4-1c-25.3,0-31.6,9.1-36,32.3c-4.2,22.5-1.5,32.7,23.8,32.7
+    c7.5,0,11.3-0.4,13.7-1.1c1.8-0.5,2.4-1.5,2.7-3l0.9-4.9c0.1-0.6-0.4-1.1-1.2-1.1C252.9,54.8,249.5,55.7,241.6,55.7"/>
+        <path id="XMLID_16_" class="st0" d="M292.7,42.8c0.7,0,1.1,0.3,1,0.9l-0.7,3.5c-1,5.5-5.3,8.9-13.3,8.9c-3.6,0-5.5-1.2-4.4-6.7
+    c1.2-6.1,3.3-6.6,10.4-6.6H292.7z M285.7,26.1c8.3,0,11,1.4,9.8,7.9c-0.2,0.8-0.6,1.2-1.8,1.2h-9.3c-15.3,0-19.6,4.4-21.4,14.1
+    c-2,10.4,0.7,14.9,14.5,14.9c4.5,0,10.4-0.5,15.2-4.7c0.2-0.2,0.4-0.3,0.5-0.3s0.1,0.1,0.3,0.3l1.1,2c1,1.8,1.4,2.2,3.5,2.2h2.9
+    c1,0,1.7-0.5,1.8-1.2l4.7-24.8c2.8-14.6,0.3-20.2-19.2-20.2c-7.9,0-12.3,0.9-14.3,1.6c-2.2,0.7-2.7,1.6-3,3.1l-0.7,3.6
+    c-0.3,1.5,0,1.8,1.2,1.8C273.2,27.8,278.8,26.1,285.7,26.1"/>
+        <path id="XMLID_13_" class="st0" d="M378.2,11.1h9.5c1,0,1.7-0.5,1.8-1.2l1.7-8.9c0.1-0.6-0.4-1.2-1.4-1.2h-9.5
+    c-1,0-1.7,0.5-1.8,1.2l-1.7,8.9C376.7,10.5,377.2,11.1,378.2,11.1 M368.3,63.7h9.5c1,0,1.7-0.5,1.8-1.2l8.2-43.2
+    c0.1-0.6-0.4-1.2-1.4-1.2h-9.5c-1,0-1.7,0.5-1.8,1.2l-8.2,43.2C366.8,63.2,367.3,63.7,368.3,63.7"/>
+        <path id="XMLID_10_" class="st0" d="M456.8,42.8c0.7,0,1.1,0.3,1,0.9l-0.7,3.5c-1,5.5-5.3,8.9-13.3,8.9c-3.6,0-5.5-1.2-4.4-6.7
+    c1.2-6.1,3.3-6.6,10.4-6.6H456.8z M449.7,26.1c8.3,0,11,1.4,9.8,7.9c-0.2,0.8-0.6,1.2-1.8,1.2h-9.3c-15.3,0-19.6,4.4-21.5,14.1
+    c-2,10.4,0.7,14.9,14.5,14.9c4.5,0,10.4-0.5,15.2-4.7c0.1-0.2,0.4-0.3,0.5-0.3s0.1,0.1,0.3,0.3l1.1,2c1,1.8,1.4,2.2,3.5,2.2h2.9
+    c1,0,1.7-0.5,1.9-1.2l4.7-24.8c2.8-14.6,0.3-20.2-19.2-20.2c-7.9,0-12.3,0.9-14.3,1.6c-2.2,0.7-2.7,1.6-3,3.1l-0.7,3.6
+    c-0.3,1.5,0,1.8,1.2,1.8C437.2,27.8,442.9,26.1,449.7,26.1"/>
+        <path id="XMLID_7_" class="st0" d="M343.2,17.6c-10.2,0-15.5,1.8-19.2,4.7s-5.5,7.8-7.4,17.6l-8.1,42.8c-0.1,0.6,0.2,1.2,1.4,1.2
+    h9.5c1.3,0,1.7-0.5,1.8-1.2l3.6-19.2c0.1-0.4,0.3-0.5,0.8-0.5c1.4,0,2.9,1.3,10.7,1.3c13.1,0,22-5.4,25.5-23.8
+    C365.1,23.2,362.1,17.6,343.2,17.6 M348.6,40.5c-2.2,11.4-5.3,14.6-12.3,14.6c-3.5,0-6.4-0.4-7.6-1.6c-1.3-1.4-1.1-4.6,0.3-11.9
+    c1.2-6.3,2.2-10.9,4.1-12.5c1.8-1.6,4.7-2.2,8.5-2.2C348.6,26.8,350.7,29.1,348.6,40.5"/>
+        <path id="XMLID_6_" class="st0" d="M411.8,55.1c-6.1,0-7-2.1-6.4-5.3l4-21.3c0.1-0.5,0.6-0.8,1.3-0.8H423c0.7,0,1.2-0.3,1.3-0.8
+    l1.4-7.2c0.1-0.5-0.3-0.8-1-0.8h-11.6c-1.5,0-2.1-0.4-2-1.5l0.3-7.1c0-1.4-0.4-1.9-2.2-1.9h-7.1c-1,0-1.7,0.5-1.8,1.2l-7.8,41.3
+    c-1.7,8.9,0.9,13.5,15.8,13.5c9.6,0,10.9-1.4,11.3-3.1l1-5.3c0.2-0.8-0.5-1.3-1.3-1.3C417.7,54.6,415.3,55.1,411.8,55.1"/>
+        <path id="XMLID_3_" class="st0" d="M456.8,42.8c0.7,0,1.1,0.3,1,0.9l-0.7,3.5c-1,5.5-5.3,8.9-13.3,8.9c-3.6,0-5.5-1.2-4.4-6.7
+    c1.2-6.1,3.3-6.6,10.4-6.6H456.8z M449.7,26.1c8.3,0,11,1.4,9.8,7.9c-0.2,0.8-0.6,1.2-1.8,1.2h-9.3c-15.3,0-19.6,4.4-21.5,14.1
+    c-2,10.4,0.7,14.9,14.5,14.9c4.5,0,10.4-0.5,15.2-4.7c0.1-0.2,0.4-0.3,0.5-0.3s0.1,0.1,0.3,0.3l1.1,2c1,1.8,1.4,2.2,3.5,2.2h2.9
+    c1,0,1.7-0.5,1.9-1.2l4.7-24.8c2.8-14.6,0.3-20.2-19.2-20.2c-7.9,0-12.3,0.9-14.3,1.6c-2.2,0.7-2.7,1.6-3,3.1l-0.7,3.6
+    c-0.3,1.5,0,1.8,1.2,1.8C437.2,27.8,442.9,26.1,449.7,26.1"/>
+    </g>
+</svg>
+            </div>
+        
+    </a>
+    
+</div>
+    </div>
+
+    <div class="oc-menu__middle-col">
+        <div class="oc-menu__middle-col-top-row">
+            <h1 class="oc-menu__app-name" data-test="oc-menu__app-name">Shop</h1>
+
+            <div class="oc-menu__icons-bar-container">
+    <div class="oc-menu-icons-bar">
+        
+            
+        
+            
+                
+                    
+                
+                <div class="oc-menu-icons-bar__child">
+    <div class="oc-menu-icon">
+        <div class="oc-menu-icon__container">
+        
+            
+
+            <div class="oc-titled-button oc-menu-icon__button oc-menu-icon__button--light-overlay ">
+                <a class="oc-button" tabindex="0" type="button"
+                   href="https://p2p.opuscapita.com/proc/requisitionStatus/list">
+                    <div class="oc-button__content" style="flex-direction: row-reverse;">
+                        <div class="oc-button__label" style="text-align: right; visibility: initial;">
+                            My Orders
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            
+        
+
+        
+
+        
+
+        </div>
+        
+    </div>
+</div>
+            
+        
+            
+                
+                    
+                
+                <div class="oc-menu-icons-bar__child">
+    <div class="oc-menu-icon">
+        <div class="oc-menu-icon__container">
+        
+            <div class="oc-titled-button oc-menu-icon__button oc-menu-icon__button--with-suptitle oc-menu-icon__button--light-overlay">
+                <a class="oc-button oc-button--content-empty" href="/opc/shoppingCart/index?backUrl=">
+                    <div class="oc-button__content" style="flex-direction: row-reverse;">
+                        <div class="oc-button__label" style="text-align: right; visibility: initial;">
+                            <div style="width: 0;">&#160;</div>
+                        </div>
+
+                        <div class="oc-button__children" style="visibility: initial;">
+                            <div class="oc-svg-icon">
+                                <div class="oc-svg oc-svg-icon__svg">
+                                    
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" focusable="false">
+  <path d="M14 36c-2.21 0-3.98 1.79-3.98 4s1.77 4 3.98 4 4-1.79 4-4-1.79-4-4-4zM2 4v4h4l7.19 15.17-2.7 4.9c-.31.58-.49 1.23-.49 1.93 0 2.21 1.79 4 4 4h24v-4H14.85c-.28 0-.5-.22-.5-.5 0-.09.02-.17.06-.24L16.2 26h14.9c1.5 0 2.81-.83 3.5-2.06l7.15-12.98c.16-.28.25-.61.25-.96 0-1.11-.9-2-2-2H10.43l-1.9-4H2zm32 32c-2.21 0-3.98 1.79-3.98 4s1.77 4 3.98 4 4-1.79 4-4-1.79-4-4-4z"></path>
+</svg>
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        
+
+        
+            
+
+    
+        <div id="1474cdff-ff60-4068-982d-999e86b72d32" class="oc-menu-icon__sup-title">1</div>
+    
+
+    
+
+        
+
+        
+
+        </div>
+        
+    </div>
+</div>
+            
+        
+            
+                
+                    
+                
+                <div class="oc-menu-icons-bar__child">
+    <div class="oc-menu-icon">
+        <div class="oc-menu-icon__container">
+        
+            <div class="oc-titled-button oc-menu-icon__button oc-menu-icon__button--with-suptitle oc-menu-icon__button--light-overlay">
+                <a class="oc-button oc-button--content-empty" href="javascript:void(0)">
+                    <div class="oc-button__content" style="flex-direction: row-reverse;">
+                        <div class="oc-button__label" style="text-align: right; visibility: initial;">
+                            <div style="width: 0;">&#160;</div>
+                        </div>
+
+                        <div class="oc-button__children" style="visibility: initial;">
+                            <div class="oc-svg-icon">
+                                <div class="oc-svg oc-svg-icon__svg">
+                                    
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" focusable="false">
+  <path d="M6 26h4v-4H6v4zm0 8h4v-4H6v4zm0-16h4v-4H6v4zm8 8h28v-4H14v4zm0 8h28v-4H14v4zm0-20v4h28v-4H14z"></path>
+</svg>
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        
+
+        
+
+        
+            <div class="oc-menu-icon__children-arrow"></div>
+        
+
+        </div>
+        
+                        
+<div id="9bbc8600-36cf-4c6f-a532-77f9e02ea1ae" class="oc-menu-icon__sub-items-container hidden oc-menu-icon__sub-items-container--tablet-overlay-mode oc-menu-icon__sub-items-container--tablet-overlay-mode-right">
+    <div class="oc-menu-icon__sub-items-container--tablet-overlay-header">
+  <div class="oc-menu-icon">
+    <div class="oc-menu-icon__container">
+      <div class="oc-titled-button oc-menu-icon__button oc-menu-icon__button--light-overlay">
+        <button class=" oc-button oc-button--content-empty" tabindex="0" type="button">
+          <div class="oc-button__content" style="flex-direction: row-reverse;">
+            <div class="oc-button__label" style="text-align: right; visibility: initial;">
+              <div style="width: 0px;">&nbsp;</div>
+            </div>
+
+            <div class="oc-button__children" style="visibility: initial;">
+              <div class="oc-svg-icon ">
+                <div class="oc-svg oc-svg-icon__svg">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" focusable="false">
+  <path d="M38 12.83L35.17 10 24 21.17 12.83 10 10 12.83 21.17 24 10 35.17 12.83 38 24 26.83 35.17 38 38 35.17 26.83 24z"></path>
+</svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="oc-notifications">
+        <div class="oc-notifications__items-container">
+            
+                
+            
+        </div>
+
+    </div>
+</div>
+
+
+                    
+    </div>
+</div>
+            
+        
+
+        
+            
+
+
+
+<div class="oc-menu-icons-bar__child">
+    <div class="oc-menu-icon">
+        <div class="oc-menu-icon__container">
+        
+            <div class="oc-titled-button oc-menu-icon__button oc-menu-icon__button--with-suptitle oc-menu-icon__button--light-overlay">
+                <a class="oc-button oc-button--content-empty" href="javascript:void(0)">
+                    <div class="oc-button__content" style="flex-direction: row-reverse;">
+                        <div class="oc-button__label" style="text-align: right; visibility: initial;">
+                            <div style="width: 0;">&#160;</div>
+                        </div>
+
+                        <div class="oc-button__children" style="visibility: initial;">
+                            <div class="oc-svg-icon">
+                                <div class="oc-svg oc-svg-icon__svg">
+                                    
+    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" focusable="false">
+    <path d="M8 16h8V8H8v8zm12 24h8v-8h-8v8zM8 40h8v-8H8v8zm0-12h8v-8H8v8zm12 0h8v-8h-8v8zM32 8v8h8V8h-8zm-12 8h8V8h-8v8zm12 12h8v-8h-8v8zm0 12h8v-8h-8v8z"></path>
+</svg>
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        
+
+        
+
+        
+            <div class="oc-menu-icon__children-arrow"></div>
+        
+
+        </div>
+        
+    <div class="oc-menu-icon__sub-items-container hidden oc-menu-icon__sub-items-container--tablet-overlay-mode oc-menu-icon__sub-items-container--tablet-overlay-mode-right"
+         style="opacity: 1; pointer-events: auto; overflow: visible; height: auto;">
+        <div class="oc-menu-icon__sub-items-container--tablet-overlay-header">
+  <div class="oc-menu-icon">
+    <div class="oc-menu-icon__container">
+      <div class="oc-titled-button oc-menu-icon__button oc-menu-icon__button--light-overlay">
+        <button class=" oc-button oc-button--content-empty" tabindex="0" type="button">
+          <div class="oc-button__content" style="flex-direction: row-reverse;">
+            <div class="oc-button__label" style="text-align: right; visibility: initial;">
+              <div style="width: 0px;">&nbsp;</div>
+            </div>
+
+            <div class="oc-button__children" style="visibility: initial;">
+              <div class="oc-svg-icon ">
+                <div class="oc-svg oc-svg-icon__svg">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" focusable="false">
+  <path d="M38 12.83L35.17 10 24 21.17 12.83 10 10 12.83 21.17 24 10 35.17 12.83 38 24 26.83 35.17 38 38 35.17 26.83 24z"></path>
+</svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+        <div class="oc-menu-dropdown-grid">
+        <div class="oc-menu-dropdown-grid__items">
+            
+                <a class="oc-menu-dropdown-grid__item-container" data-test="oc-menu-dropdown-grid__item-container"
+   href="https://p2p.opuscapita.com/opc">
+    <div class="oc-menu-dropdown-grid__item oc-menu-dropdown-grid__item--active ">
+        <div class="oc-menu-dropdown-grid__item-image">
+            <div class="oc-svg">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40.53 40.53" focusable="false">
+    <defs>
+        <style>.cls-1 {
+            fill: #67707c;
+        }</style>
+    </defs>
+    <g id="tools">
+        <line class="cls-1" x1="10.48" y1="10.66" x2="10.44" y2="10.72"></line>
+        <line class="cls-1" x1="29.47" y1="10.72" x2="29.43" y2="10.66"></line>
+        <path class="cls-1" d="M9.81,23.47V33.69H22.59v-8.1H27.9v8.1h2.81V23.47Zm10,8H12.63V25.59h7.14Z"></path>
+        <path class="cls-1"
+              d="M30.71,14.8H9.86L6.68,20.14a2.87,2.87,0,0,0,3.08,2.59A3.39,3.39,0,0,0,11.88,22a3.54,3.54,0,0,0,4.2,0,3.54,3.54,0,0,0,4.17,0,3.54,3.54,0,0,0,4.13,0,3.39,3.39,0,0,0,2,.66A3.33,3.33,0,0,0,28.6,22a3.37,3.37,0,0,0,2.15.74,2.85,2.85,0,0,0,3.09-2.59Zm0,5.93c-.65,0-1.08-.36-1.08-.59H27.52c0,.23-.44.59-1.09.59a1.18,1.18,0,0,1-1-.48.26.26,0,0,1,0-.11h-2a.26.26,0,0,1,0,.11,1.18,1.18,0,0,1-1,.48,1.21,1.21,0,0,1-1.06-.48.26.26,0,0,1,0-.11h-2a.26.26,0,0,1,0,.11,1.18,1.18,0,0,1-1.06.48c-.65,0-1.08-.36-1.08-.59h-2c0,.23-.44.59-1.09.59s-1.08-.36-1.08-.59h-2c0,.23-.43.59-1.09.59s-1.08-.36-1.08-.59L10.44,17H30l1.84,3.16C31.84,20.37,31.41,20.73,30.75,20.73Z"></path>
+        <path class="cls-1" d="M21.26,20.14a.41.41,0,0,1,0,.11.26.26,0,0,1,0-.11Z"></path>
+        <path class="cls-1" d="M19.26,20.14a.26.26,0,0,1,0,.11.41.41,0,0,1,0-.11Z"></path>
+        <path class="cls-1" d="M25.39,20.14a.41.41,0,0,1,0,.11.26.26,0,0,1,0-.11Z"></path>
+        <path class="cls-1" d="M23.39,20.14a.26.26,0,0,1,0,.11.41.41,0,0,1,0-.11Z"></path>
+        <rect class="cls-1" x="9.81" y="12.35" width="20.85" height="1.5"></rect>
+    </g>
+</svg>
+            </div>
+        </div>
+
+        <div class="oc-menu-dropdown-grid__item-label">
+            Shop
+        </div>
+    </div>
+</a>
+
+                <a class="oc-menu-dropdown-grid__item-container" data-test="oc-menu-dropdown-grid__item-container"
+   href="https://p2p.opuscapita.com/proc">
+    <div class="oc-menu-dropdown-grid__item  ">
+        <div class="oc-menu-dropdown-grid__item-image">
+            <div class="oc-svg">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40.53 40.53" focusable="false">
+    <defs>
+        <style>.cls-1 {
+            fill: none;
+            stroke: #67707c;
+            stroke-miterlimit: 10;
+            stroke-width: 0.25px;
+        }
+
+        .cls-2 {
+            fill: #67707c;
+        }</style>
+    </defs>
+    <g id="invoices">
+        <line class="cls-1" x1="34.96" y1="37.41" x2="34.96" y2="37.41"></line>
+        <rect class="cls-2" x="9.83" y="31.84" width="20.57" height="1.79"></rect>
+        <path class="cls-2"
+              d="M6.22,24a1,1,0,0,1-.92-.84,9.45,9.45,0,0,1,.79-6.28,7.26,7.26,0,0,1,4.35-3.79,1,1,0,0,1,1.15.81,1.14,1.14,0,0,1-.69,1.35,5.31,5.31,0,0,0-3.19,2.77,6.92,6.92,0,0,0-.58,4.59A1.14,1.14,0,0,1,6.45,24,.83.83,0,0,1,6.22,24Z"></path>
+        <path class="cls-2"
+              d="M34.31,24a1,1,0,0,0,.92-.84,9.45,9.45,0,0,0-.79-6.28,7.26,7.26,0,0,0-4.35-3.79,1,1,0,0,0-1.15.81,1.14,1.14,0,0,0,.69,1.35,5.31,5.31,0,0,1,3.19,2.77,6.92,6.92,0,0,1,.58,4.59A1.14,1.14,0,0,0,34.08,24,.83.83,0,0,0,34.31,24Z"></path>
+        <path class="cls-2"
+              d="M10,30.4c0-7,4.61-12.7,10.29-12.7s10.29,5.69,10.29,12.7m-15.7-1.1A9.56,9.56,0,0,1,20.26,19c-4.33,0-7.83,4.59-7.83,10.25h0l2.41,0"></path>
+        <path class="cls-2" d="M17.92,16.39c0-1.64,1-3,2.34-3s2.34,1.33,2.34,3"></path>
+    </g>
+</svg>
+            </div>
+        </div>
+
+        <div class="oc-menu-dropdown-grid__item-label">
+            Order
+        </div>
+    </div>
+</a>
+
+                <a class="oc-menu-dropdown-grid__item-container" data-test="oc-menu-dropdown-grid__item-container"
+   href="https://stage.businessnetwork.opuscapita.com/invoice">
+    <div class="oc-menu-dropdown-grid__item  ">
+        <div class="oc-menu-dropdown-grid__item-image">
+            <div class="oc-svg">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40.53 40.53" focusable="false">
+    <defs>
+        <style>.cls-1 {
+            fill: #67707c;
+        }</style>
+    </defs>
+    <g id="invoices">
+        <path class="cls-1"
+              d="M15.71,10.34a1.25,1.25,0,0,0-1.21,1.21h2.32A1.09,1.09,0,0,0,15.71,10.34Zm0,0a1.25,1.25,0,0,0-1.21,1.21h2.32A1.09,1.09,0,0,0,15.71,10.34Zm0,0a1.25,1.25,0,0,0-1.21,1.21h2.32A1.09,1.09,0,0,0,15.71,10.34Z"></path>
+        <polyline class="cls-1" points="30.77 14.62 22.82 14.62 22.82 6.66"></polyline>
+        <path class="cls-1"
+              d="M21.52,15.87V6.67H9.76v27.2h21v-18ZM15.83,9.09a2.72,2.72,0,0,1,2.81,3,4.86,4.86,0,0,1-.06.73H14.51c.07.78.87,1.15,1.78,1.15A5.75,5.75,0,0,0,18,13.73L18.29,15a6.38,6.38,0,0,1-2.28.37c-2.14,0-3.37-1.18-3.37-3.07A3.08,3.08,0,0,1,15.83,9.09ZM28.89,31.35H11.64V29.69H28.89Zm0-3.83H11.64V25.87H28.89Zm0-3.83H11.64V22H28.89Z"></path>
+    </g>
+</svg>
+            </div>
+        </div>
+
+        <div class="oc-menu-dropdown-grid__item-label">
+            Invoice
+        </div>
+    </div>
+</a>
+            
+
+            
+                <a class="oc-menu-dropdown-grid__item-container" data-test="oc-menu-dropdown-grid__item-container"
+   href="https://p2p.opuscapita.com/invt">
+    <div class="oc-menu-dropdown-grid__item  ">
+        <div class="oc-menu-dropdown-grid__item-image">
+            <div class="oc-svg">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40.53 40.53" focusable="false">
+    <defs>
+        <style>.cls-1 {
+            fill: #67707c;
+        }</style>
+    </defs>
+    <g id="invoices">
+        <rect class="cls-1" x="14.82" y="27.17" width="12.68" height="2"></rect>
+        <rect class="cls-1" x="14.82" y="23.17" width="12.68" height="2"></rect>
+        <rect class="cls-1" x="14.82" y="19.17" width="12.68" height="2"></rect>
+        <rect class="cls-1" x="14.82" y="15.17" width="12.68" height="2"></rect>
+        <polygon class="cls-1"
+                 points="30.86 12.34 30.86 31.25 11.81 31.25 11.81 12.3 9.81 12.3 9.81 33.24 32.86 33.24 32.86 12.34 30.86 12.34"></polygon>
+    </g>
+</svg>
+            </div>
+        </div>
+
+        <div class="oc-menu-dropdown-grid__item-label">
+            Inventory
+        </div>
+    </div>
+</a>
+
+                <a class="oc-menu-dropdown-grid__item-container" data-test="oc-menu-dropdown-grid__item-container"
+   href="https://develop.businessnetwork.opuscapita.com/analytics">
+    <div class="oc-menu-dropdown-grid__item  ">
+        <div class="oc-menu-dropdown-grid__item-image">
+            <div class="oc-svg">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40.53 40.53" focusable="false">
+    <defs>
+        <style>.cls-1 {
+            fill: #67707c;
+        }</style>
+    </defs>
+    <g id="tools">
+        <path class="cls-1"
+              d="M32.18,32.72l-7.05-7.05a10.12,10.12,0,1,0-2.3,2.3L29.89,35a1.62,1.62,0,0,0,2.3-2.3Zm-20.07-8.1a6.84,6.84,0,1,1,4.84,2A6.8,6.8,0,0,1,12.11,24.62Z"></path>
+        <rect class="cls-1" x="18.9" y="17.06" width="2.17" height="6.7"></rect>
+        <rect class="cls-1" x="15.55" y="14.9" width="2.17" height="8.86"></rect>
+        <rect class="cls-1" x="12.4" y="19.43" width="2.17" height="4.33"></rect>
+    </g>
+</svg>
+            </div>
+        </div>
+
+        <div class="oc-menu-dropdown-grid__item-label">
+            Analytics
+        </div>
+    </div>
+</a>
+
+                <div class="oc-menu-dropdown-grid__item-container"></div>
+            
+
+            
+                <a class="oc-menu-dropdown-grid__item-container" data-test="oc-menu-dropdown-grid__item-container"
+   href="https://p2p.opuscapita.com/rfq">
+    <div class="oc-menu-dropdown-grid__item  ">
+        <div class="oc-menu-dropdown-grid__item-image">
+            <div class="oc-svg">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40.53 40.53" focusable="false">
+    <defs>
+        <style>.cls-1 {
+            fill: #67707c;
+        }</style>
+    </defs>
+    <g id="tools">
+        <path class="cls-1"
+              d="M14,23.91c2,0,3.69.62,3.69,1.38S16.06,26.67,14,26.67s-3.69-.62-3.69-1.38S12,23.91,14,23.91Z"></path>
+        <path class="cls-1"
+              d="M17.68,28s-.62,1.21-3.65,1.21S10.33,28,10.33,28V26.67A5,5,0,0,0,14,27.88c2.63,0,3.65-1.21,3.65-1.21Z"></path>
+        <path class="cls-1"
+              d="M17.68,30.53s-.62,1.21-3.65,1.21-3.69-1.21-3.69-1.21V29.21A5,5,0,0,0,14,30.41c2.63,0,3.65-1.21,3.65-1.21Z"></path>
+        <path class="cls-1"
+              d="M17.68,33.07s-.62,1.21-3.65,1.21-3.69-1.21-3.69-1.21V31.74A5,5,0,0,0,14,32.95c2.63,0,3.65-1.21,3.65-1.21Z"></path>
+        <path class="cls-1"
+              d="M32.51,21.41l-6.18,6.42a1.5,1.5,0,0,1-2.12,0L15.09,19.1a1.24,1.24,0,0,1-.18-.22l0,0a1.47,1.47,0,0,1-.45-1.06V11.54a1.5,1.5,0,0,1,1.5-1.5H22.2a1.33,1.33,0,0,1,.65.16.69.69,0,0,1,.19.1,1,1,0,0,1,.3.21l9.13,8.78A1.51,1.51,0,0,1,32.51,21.41ZM19,12.88a1.58,1.58,0,1,0,1.58,1.58A1.58,1.58,0,0,0,19,12.88Z"></path>
+    </g>
+</svg>
+            </div>
+        </div>
+
+        <div class="oc-menu-dropdown-grid__item-label">
+            Quote
+        </div>
+    </div>
+</a>
+                <a class="oc-menu-dropdown-grid__item-container" data-test="oc-menu-dropdown-grid__item-container"
+   href="https://p2p.opuscapita.com/sim">
+    <div class="oc-menu-dropdown-grid__item  ">
+        <div class="oc-menu-dropdown-grid__item-image">
+            <div class="oc-svg">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40.53 40.53" focusable="false">
+    <defs>
+        <style>.cls-1 {
+            fill: #67707c;
+        }</style>
+    </defs>
+    <g id="tools">
+        <rect class="cls-1" x="23.06" y="18.5" width="8.57" height="2"></rect>
+        <rect class="cls-1" x="23.06" y="22.34" width="8.57" height="2"></rect>
+        <rect class="cls-1" x="23.06" y="26.17" width="8.57" height="2"></rect>
+        <path class="cls-1"
+              d="M15.44,17.8a3,3,0,0,1,3.22,3.31c0,2.2-1.82,4.66-3.22,4.66s-3.22-2.46-3.22-4.66A3,3,0,0,1,15.44,17.8Z"></path>
+        <path class="cls-1"
+              d="M10.58,28.19c0-1.85,1.21-2.22,2.94-2.59a3,3,0,0,0,1.92,1.13,3.09,3.09,0,0,0,1.92-1.19c1.73.37,2.94.8,2.94,2.65S10.58,30,10.58,28.19Z"></path>
+        <path class="cls-1"
+              d="M33.62,12.75H8.41a2,2,0,0,0-2,2V31.93a2,2,0,0,0,2,2H33.62a2,2,0,0,0,2-2V14.75A2,2,0,0,0,33.62,12.75Zm0,17.29a2,2,0,0,1-2,2H27.22v-.22a.91.91,0,0,0-1.81,0V32h-8.5v-.22a.91.91,0,0,0-1.81,0V32H10.41a2,2,0,0,1-2-2V16.84a2,2,0,0,1,2-2H31.58a2,2,0,0,1,2,2Z"></path>
+    </g>
+</svg>
+            </div>
+        </div>
+
+        <div class="oc-menu-dropdown-grid__item-label">
+            Supplier Information
+        </div>
+    </div>
+</a>
+                <a class="oc-menu-dropdown-grid__item-container" data-test="oc-menu-dropdown-grid__item-container"
+   href="javascript:void(0)">
+    <div class="oc-menu-dropdown-grid__item  oc-menu-dropdown-grid__item--disabled">
+        <div class="oc-menu-dropdown-grid__item-image">
+            <div class="oc-svg">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40.53 40.53" focusable="false">
+    <defs>
+        <style>.cls-1 {
+            fill: #67707c;
+        }</style>
+    </defs>
+    <g id="invoices">
+        <path class="cls-1"
+              d="M35.43,7.83l-.06-.06a1.86,1.86,0,0,1,.11,2.77l-6.14,6.14-2.8-2.8,6.14-6.14A1.85,1.85,0,0,1,35.43,7.83Z"></path>
+        <polygon class="cls-1" points="23.94 19.16 28.45 17.66 25.45 14.65 23.94 19.16"></polygon>
+        <path class="cls-1"
+              d="M16.87,20.68l0-.9a.5.5,0,0,0-.93-.25c-.79,1.24-2.33,1.71-3.18,2.93-.37.53.22,1,.86.5h0"></path>
+        <path class="cls-1"
+              d="M15.89,21.32c0,.35.09.7.64.53a3.44,3.44,0,0,0,.48-.16,3.84,3.84,0,0,1,.36-.21c.07,0,0,.24.2.39a1.33,1.33,0,0,0,.5.43A7.88,7.88,0,0,0,22.13,22c.61-.19.35-1.15-.27-1-.83.25-3.36,1-3.59-.15a.5.5,0,0,0-.35-.35,1.09,1.09,0,0,0-1.05.17"></path>
+        <polygon class="cls-1"
+                 points="23.84 20.31 23.84 25.32 11.59 25.32 11.59 8.78 23.84 8.78 23.84 13.56 25.84 13.56 25.84 6.78 9.59 6.78 9.59 27.32 25.84 27.32 25.84 20.31 23.84 20.31"></polygon>
+        <path class="cls-1" d="M17.76,28.75v2.67H5.5V14.89H8.12v-2H3.5V33.42H19.76V28.75Z"></path>
+    </g>
+</svg>
+            </div>
+        </div>
+
+        <div class="oc-menu-dropdown-grid__item-label">
+            Contracts
+        </div>
+    </div>
+</a>
+            
+
+            
+
+            
+                <a class="oc-menu-dropdown-grid__item-container" data-test="oc-menu-dropdown-grid__item-container"
+   href="javascript:void(0)">
+    <div class="oc-menu-dropdown-grid__item  oc-menu-dropdown-grid__item--disabled">
+        <div class="oc-menu-dropdown-grid__item-image">
+            <div class="oc-svg">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40.53 40.53" focusable="false">
+    <defs>
+        <style>.cls-1 {
+            fill: #67707c;
+        }</style>
+    </defs>
+    <g id="tools">
+        <path class="cls-1"
+              d="M8.4,7.91A1.64,1.64,0,0,1,10.13,9.7c0,1.19-1,2.51-1.73,2.51S6.66,10.88,6.66,9.7A1.64,1.64,0,0,1,8.4,7.91Z"></path>
+        <path class="cls-1"
+              d="M5.78,13.52c0-1,.65-1.2,1.59-1.4a1.61,1.61,0,0,0,1,.61,1.67,1.67,0,0,0,1-.64c.93.2,1.59.43,1.59,1.43S5.78,14.52,5.78,13.52Z"></path>
+        <g id="globe-2">
+            <path class="cls-1" d="M19.1,12.62Z"></path>
+            <path class="cls-1"
+                  d="M20.64,9.3a8.93,8.93,0,1,0,8.77,7.24A9,9,0,0,0,20.64,9.3Zm8.16,8.93q0,.23,0,.46a3,3,0,0,0-.69-1.28,3.4,3.4,0,0,0-.92-.52c-.25-.11-.56-.45-.83-.43.1.15.17.43.29.54s.38,0,.51.11.1.18.14.24c.24.32.11.36-.2.58a4.09,4.09,0,0,1-.66.43c-.67.31-.67-.29-1-.73-.08-.12-1-1.56-1.06-1.54.21-.11.13.05.22-.16s0-.42,0-.6c-.43.26-.54.29-.83-.19s-.14-.56.25-.69.94.14,1.1,0c.36-.27-.54-.59-.56-.55a1.25,1.25,0,0,1,.25-.25.79.79,0,0,0-.57.05c-.41.13-.42.26-.58.57s-.24.24-.56.31-.46,0-.19.38c-.18-.22-.25-.49-.41-.7a3.15,3.15,0,0,0-.9-.55c-.06.4.42.59.6.89l-.41,0c.07-.24-.49-.64-.72-.66-.6-.05-.92.55-1.28.88s-.94.31-1.08-.05a1.23,1.23,0,0,1,0-.54c.09-.28,0-.22.35-.29a1.14,1.14,0,0,0,.47-.15.49.49,0,0,0,.16-.19c0-.11,0-.11,0-.18.1-.34.13-.32.49-.48a2.42,2.42,0,0,0,.58-.4c.2-.17.33-.32.58-.24s.32.37.53.39c.63,0,.46-.67.31-1-.17.28-.29.71-.68.5-.18-.1-.11-.28-.24-.4s-.49,0-.53,0c-.21-.36.65-.64.81-.7A3.38,3.38,0,0,1,22.94,11a5.59,5.59,0,0,1,.9-.05c.38.08.39.57.76.58.11,0,.2-.14.3-.14a.68.68,0,0,1,.39.19A8.24,8.24,0,0,1,27.59,14,8.14,8.14,0,0,1,28.79,18.23ZM14.13,13.42c0,.1-.07.16-.07.28s.14.27.16.4a.41.41,0,0,1-.11.41c-.11.13-.87.46-.8.71,0,0,.3-.17.29-.07,0,.45-.66,1-.84,1.4s-.08,1-.27,1.49A8.11,8.11,0,0,1,13,15.45C13.15,15,13.63,13.56,14.13,13.42Zm1-1.18a8.19,8.19,0,0,1,2.6-1.62c-.23.29-.56.41-.83.68s-.34.42-.53.62-.49.57-.77.57-.54-.09-.48-.25C15.87,11.55,15.1,12.28,15.12,12.24ZM18.8,13a.25.25,0,0,1,0-.37c.1-.11.17-.06.34,0,0-.17-.09-.78.28-.7a5.71,5.71,0,0,1,.6.74,1.64,1.64,0,0,1-.88.31c0-.11,0-.22,0-.33Zm4,2.89a4.18,4.18,0,0,1,1.09.29,1.67,1.67,0,0,1,1,1.09,5,5,0,0,0,.66,1.32c.11.15.31.57.46.62s.39-.06.52-.09c-.17.84-1.13,1.26-1.33,2.08-.07.27.11.56.07.83s-.29.46-.47.68a1.73,1.73,0,0,0-.38.54c0,.12.07.28,0,.39s-.26.21-.37.32a2.32,2.32,0,0,1-1,.73,5.12,5.12,0,0,1-.89.15,2.55,2.55,0,0,0-.23-1.15c-.12-.28-.4-.56-.43-.86s.19-.48.23-.73a2.36,2.36,0,0,0-.15-.9c-.14-.34-.35-.38-.41-.79s.05-.61-.26-.65c-.13,0-.27.16-.41.09s-.08-.28-.28-.33-.74.29-.94.33a.6.6,0,0,1-.68-.14A2.37,2.37,0,0,1,17.47,18a2.13,2.13,0,0,1,.17-1.09c.17-.31.45-.4.7-.63s.28-.54.5-.75.54-.15.86-.25a2.26,2.26,0,0,1,.89-.23,2.07,2.07,0,0,1,.68.09c.25.25,0,.55.43.73a1.27,1.27,0,0,0,1.1-.05Zm3.54,6A2.28,2.28,0,0,1,26,23.09c-.28.39-.7.55-.53-.08a2,2,0,0,1,.35-.76c.07-.08.2-.09.26-.16a2.19,2.19,0,0,0,.23-.43A1.25,1.25,0,0,1,26.33,21.87ZM12.69,20a4.21,4.21,0,0,1,1.05.64c.37.28.41.64.67,1s.79.4,1.15.69.24.39.12.78a3.26,3.26,0,0,0-.07.68c0,.24.14.17-.18.32s-.45,0-.65-.25A8.18,8.18,0,0,1,12.69,20S13.06,21.66,12.69,20Z"></path>
+        </g>
+        <path class="cls-1"
+              d="M20.64,28.74a1.64,1.64,0,0,1,1.73,1.78c0,1.19-1,2.51-1.73,2.51s-1.73-1.33-1.73-2.51A1.64,1.64,0,0,1,20.64,28.74Z"></path>
+        <path class="cls-1"
+              d="M18,34.35c0-1,.65-1.2,1.59-1.4a1.61,1.61,0,0,0,1,.61,1.67,1.67,0,0,0,1-.64c.93.2,1.59.43,1.59,1.43S18,35.35,18,34.35Z"></path>
+        <path class="cls-1"
+              d="M32.13,8.91a1.64,1.64,0,0,1,1.73,1.78c0,1.19-1,2.51-1.73,2.51S30.4,11.89,30.4,10.7A1.64,1.64,0,0,1,32.13,8.91Z"></path>
+        <path class="cls-1"
+              d="M29.51,14.52c0-1,.65-1.2,1.59-1.4a1.61,1.61,0,0,0,1,.61,1.67,1.67,0,0,0,1-.64c.93.2,1.59.43,1.59,1.43S29.51,15.52,29.51,14.52Z"></path>
+    </g>
+</svg>
+            </div>
+        </div>
+
+        <div class="oc-menu-dropdown-grid__item-label">
+            Business Network Portal
+        </div>
+    </div>
+</a>
+                <a class="oc-menu-dropdown-grid__item-container" data-test="oc-menu-dropdown-grid__item-container"
+   href="https://p2p.opuscapita.com/ssm">
+    <div class="oc-menu-dropdown-grid__item  ">
+        <div class="oc-menu-dropdown-grid__item-image">
+            <div class="oc-svg">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40.53 40.53" focusable="false">
+    <defs>
+        <style>.cls-1 {
+            fill: #67707c;
+        }</style>
+    </defs>
+    <g id="tools">
+        <path class="cls-1"
+              d="M33.43,27.66l-.14,0a11.21,11.21,0,0,0-3.86-.78,6.65,6.65,0,0,0-3,.57,6.29,6.29,0,0,0-3.07-.57,11.21,11.21,0,0,0-3.86.78l-.14,0-1.13,9h.28a5.6,5.6,0,0,0,2.05-.47l.4-.12a9,9,0,0,1,2.58-.48,3.63,3.63,0,0,1,2.7,1l.18.19.18-.19a3.63,3.63,0,0,1,2.7-1,11.78,11.78,0,0,1,3.11.58,5.85,5.85,0,0,0,2.1.49h.29Zm-12,6.81-.55.13a8,8,0,0,0-.87.29l.82-6.25a8.39,8.39,0,0,1,2.64-.4,4.48,4.48,0,0,1,2.38.62v5.82a5.94,5.94,0,0,0-2.38-.51,5.48,5.48,0,0,0-.76,0c-.24,0-.42.05-.67.11m10.48.51a8,8,0,0,0-1.29-.39,8.48,8.48,0,0,0-2-.27,6.54,6.54,0,0,0-2.38.51V28.89a4.47,4.47,0,0,1,2.38-.65,8.45,8.45,0,0,1,2.65.4l1,6.32Z"></path>
+        <path class="cls-1"
+              d="M19.73,16.47l-.14,0a11.21,11.21,0,0,0-3.86-.78,6.65,6.65,0,0,0-3,.57,6.29,6.29,0,0,0-3.07-.57,11.21,11.21,0,0,0-3.86.78l-.14,0-1.13,9h.28A5.6,5.6,0,0,0,6.81,25l.4-.12a9,9,0,0,1,2.58-.48,3.63,3.63,0,0,1,2.7,1l.18.19.18-.19a3.63,3.63,0,0,1,2.7-1,11.78,11.78,0,0,1,3.11.58,5.85,5.85,0,0,0,2.1.49h.29Zm-12,6.81-.55.13a8,8,0,0,0-.87.29l.82-6.25a8.39,8.39,0,0,1,2.64-.4,4.48,4.48,0,0,1,2.38.62v5.82A5.94,5.94,0,0,0,9.79,23,5.48,5.48,0,0,0,9,23c-.24,0-.42.05-.67.11m10.48.51a8,8,0,0,0-1.29-.39,8.48,8.48,0,0,0-2-.27,6.54,6.54,0,0,0-2.38.51V17.7a4.47,4.47,0,0,1,2.38-.65,8.45,8.45,0,0,1,2.65.4l1,6.32Z"></path>
+        <path class="cls-1"
+              d="M32.87,4.88l-.14,0a11.21,11.21,0,0,0-3.86-.78,6.65,6.65,0,0,0-3,.57,6.29,6.29,0,0,0-3.07-.57,11.21,11.21,0,0,0-3.86.78l-.14,0-1.13,9h.28a5.6,5.6,0,0,0,2.05-.47l.4-.12a9,9,0,0,1,2.58-.48,3.63,3.63,0,0,1,2.7,1l.18.19L26,13.8a3.63,3.63,0,0,1,2.7-1,11.78,11.78,0,0,1,3.11.58,5.85,5.85,0,0,0,2.1.49h.29Zm-12,6.81-.55.13a8,8,0,0,0-.87.29l.82-6.25a8.39,8.39,0,0,1,2.64-.4,4.48,4.48,0,0,1,2.38.62V11.9a5.94,5.94,0,0,0-2.38-.51,5.48,5.48,0,0,0-.76,0c-.24,0-.42.05-.67.11M32,12.05a8,8,0,0,0-1.29-.39,8.48,8.48,0,0,0-2-.27,6.54,6.54,0,0,0-2.38.51V6.11a4.47,4.47,0,0,1,2.38-.65,8.45,8.45,0,0,1,2.65.4l1,6.32Z"></path>
+    </g>
+</svg>
+            </div>
+        </div>
+
+        <div class="oc-menu-dropdown-grid__item-label">
+            Catalog Portal
+        </div>
+    </div>
+</a>
+                <a class="oc-menu-dropdown-grid__item-container" data-test="oc-menu-dropdown-grid__item-container"
+   href="https://p2p.opuscapita.com/sdp">
+    <div class="oc-menu-dropdown-grid__item  ">
+        <div class="oc-menu-dropdown-grid__item-image">
+            <div class="oc-svg">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40.53 40.53" focusable="false">
+    <defs>
+        <style>.cls-1 {
+            fill: #67707c;
+        }</style>
+    </defs>
+    <g id="invoices">
+        <polyline class="cls-1" points="16.56 13.3 13.15 13.3 13.15 9.99"></polyline>
+        <path class="cls-1" d="M16.47,24.08H5.14V9.82h7v4.34h4.36ZM6.55,22.66h8.5V15.58H10.69V11.24H6.55Z"></path>
+        <polyline class="cls-1" points="32.74 8 29.33 8 29.33 4.69"></polyline>
+        <path class="cls-1" d="M32.65,18.78H21.32V4.52h7V8.86h4.36Zm-9.91-1.42h8.5V10.28H26.87V5.94H22.73Z"></path>
+        <polyline class="cls-1" points="30.68 24.66 27.27 24.66 27.27 21.35"></polyline>
+        <path class="cls-1" d="M30.58,35.44H19.25V21.18h7v4.34h4.36ZM20.67,34h8.5V26.94H24.81V22.6H20.67Z"></path>
+    </g>
+</svg>
+            </div>
+        </div>
+
+        <div class="oc-menu-dropdown-grid__item-label">
+            Document Portal
+        </div>
+    </div>
+</a>
+            
+
+            
+                <a class="oc-menu-dropdown-grid__item-container" data-test="oc-menu-dropdown-grid__item-container"
+   href="https://p2p.opuscapita.com/pim">
+    <div class="oc-menu-dropdown-grid__item  ">
+        <div class="oc-menu-dropdown-grid__item-image">
+            <div class="oc-svg">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40.53 40.53" focusable="false">
+    <defs>
+        <style>.cls-1 {
+            fill: #67707c;
+        }</style>
+    </defs>
+    <g id="tools">
+        <polygon class="cls-1"
+                 points="28.9 29.31 27.3 29.31 27.3 26.99 26.48 26.99 28.12 24.64 29.76 26.99 28.9 26.99 28.9 29.31"></polygon>
+        <polygon class="cls-1"
+                 points="24.97 29.31 23.37 29.31 23.37 26.99 22.55 26.99 24.19 24.64 25.83 26.99 24.97 26.99 24.97 29.31"></polygon>
+        <polygon class="cls-1"
+                 points="16.92 20.26 15.33 20.26 15.33 17.97 14.52 17.97 16.14 15.64 17.76 17.97 16.92 17.97 16.92 20.26"></polygon>
+        <polygon class="cls-1"
+                 points="12.85 20.26 11.27 20.26 11.27 17.97 10.45 17.97 12.08 15.64 13.7 17.97 12.85 17.97 12.85 20.26"></polygon>
+        <path class="cls-1" d="M18.75,19.08V33.85H33.52V19.08ZM31.86,32.19H20.41V20.74h4V23h3.26V20.74h4.15Z"></path>
+        <path class="cls-1" d="M6.33,10V25H17.47V23.35H8V11.66h4.12V14h3.32V11.66h4.23v6.22h1.7V10Z"></path>
+    </g>
+</svg>
+            </div>
+        </div>
+
+        <div class="oc-menu-dropdown-grid__item-label">
+            Product Information
+        </div>
+    </div>
+</a>
+                <a class="oc-menu-dropdown-grid__item-container" data-test="oc-menu-dropdown-grid__item-container"
+   href="https://p2p.opuscapita.com/prov">
+    <div class="oc-menu-dropdown-grid__item  ">
+        <div class="oc-menu-dropdown-grid__item-image">
+            <div class="oc-svg">
+                <svg fill="#67707c" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 48 48" focusable="false" style="width: 32px; height: 32px;">
+  <path d="M37.98 23c.68 0 1.36.06 2.02.15V0L0 40h23.13c-.09-.66-.15-1.32-.15-2 0-8.28 6.72-15 15-15zm7.43 15.98c.04-.32.07-.64.07-.98 0-.33-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.37-2.65c-.04-.24-.25-.42-.5-.42h-4c-.25 0-.46.18-.49.42l-.37 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98 0 .33.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.13.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.37 2.65c.04.24.25.42.49.42h4c.25 0 .45-.18.49-.42l.37-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.13-.22.07-.49-.12-.64l-2.1-1.65zM37.98 41c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"/>
+</svg>
+
+            </div>
+        </div>
+
+        <div class="oc-menu-dropdown-grid__item-label">
+            User and Master Data
+        </div>
+    </div>
+</a>
+            
+        </div>
+        </div>
+    </div>
+
+    </div>
+</div>
+        
+        
+            
+
+<div class="oc-menu-icons-bar__child">
+    <div class="oc-menu-icon">
+        <div class="oc-menu-icon__container">
+        
+            
+
+            <div class="oc-titled-button oc-menu-icon__button oc-menu-icon__button--light-overlay oc-menu-icon__button--with-dropdown">
+                <a class="oc-button" tabindex="0" type="button"
+                   href="javascript:void(0)">
+                    <div class="oc-button__content" style="flex-direction: row-reverse;">
+                        <div class="oc-button__label" style="text-align: right; visibility: initial;">
+                            Peter.Bedarf
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            
+                <div class="oc-menu-icon__dropdown-icon">
+                    <div class="oc-svg ">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"
+                             focusable="false">
+                            <path d="M14 20l10 10 10-10z"></path></svg>
+                    </div>
+                </div>
+            
+        
+
+        
+
+        
+            <div class="oc-menu-icon__children-arrow"></div>
+        
+
+        </div>
+        
+    <div class="oc-menu-icon__sub-items-container hidden oc-menu-icon__sub-items-container--tablet-overlay-mode oc-menu-icon__sub-items-container--tablet-overlay-mode-right"
+         style="opacity: 1; pointer-events: auto; overflow: visible; height: auto;">
+        <div class="oc-menu-icon__sub-items-container--tablet-overlay-header">
+  <div class="oc-menu-icon">
+    <div class="oc-menu-icon__container">
+      <div class="oc-titled-button oc-menu-icon__button oc-menu-icon__button--light-overlay">
+        <button class=" oc-button oc-button--content-empty" tabindex="0" type="button">
+          <div class="oc-button__content" style="flex-direction: row-reverse;">
+            <div class="oc-button__label" style="text-align: right; visibility: initial;">
+              <div style="width: 0px;">&nbsp;</div>
+            </div>
+
+            <div class="oc-button__children" style="visibility: initial;">
+              <div class="oc-svg-icon ">
+                <div class="oc-svg oc-svg-icon__svg">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" focusable="false">
+  <path d="M38 12.83L35.17 10 24 21.17 12.83 10 10 12.83 21.17 24 10 35.17 12.83 38 24 26.83 35.17 38 38 35.17 26.83 24z"></path>
+</svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+        <div class="oc-menu-account">
+            <div class="oc-menu-account__top-row">
+                <div class="oc-menu-account__account-icon-container">
+                    
+                        <div class="oc-menu-account-icon"
+                             style="background-image: url('/opc/api/users/Peter.Bedarf/picture');"></div>
+                    
+                </div>
+
+                <div class="oc-menu-account__name-container">
+                    
+                        <div class="oc-menu-account__full-name">Peter Bedarf</div>
+                    
+                    
+                        <div class="oc-menu-account__user-name">Peter.Bedarf</div>
+                    
+                </div>
+            </div>
+
+            <div class="oc-menu-account__middle-row">
+                <div class="oc-menu-account__actions-container">
+                    
+                        
+                            <a class="oc-menu-account__action-button oc-button "
+                               href="/opc/requisitionDefaults/show">Requisition Defaults</a>
+                        
+                    
+                        
+                            <a class="oc-menu-account__action-button oc-button "
+                               href="/opc/buyingOnBehalfOf/showBuyingOnBehalfOf">Buying on behalf of</a>
+                        
+                    
+                        
+                            <a class="oc-menu-account__action-button oc-button "
+                               href="/opc/delegation/listUserDelegations">Delegation</a>
+                        
+                    
+                        
+                            <a href="/opc/static/userManualContent/en/Checkout+Page.html" class="oc-menu-account__action-button oc-button" target="_blank">Help</a>
+                        
+                    
+                        
+                            <a class="oc-menu-account__action-button oc-button "
+                               href="/opc/logout/logout">Logout</a>
+                        
+                    
+                </div>
+            </div>
+
+            <div class="oc-menu-account__bottom-row">
+                
+                    <div class="oc-menu-account__select-item">
+                        <span class="oc-menu-account__select-item-label">
+                            Current assignment
+                        </span>
+                        
+<a href="javascript:void(0);" class="text-right"
+   onclick="showPopupContainerDialog('/opc/changeCustomer/showChangeCustomerDialog');">
+    Musterkunden AG (OC001)
+</a>
+
+                    </div>
+                
+
+                
+                    
+<div class="oc-menu-account__select-item">
+    <span class="oc-menu-account__select-item-label">
+        <a class="text-nowrap " style="text-decoration: none; color: #333;"
+         href="/opc/administration/toggleCompanyIssuedEquipmentMode">
+            <span class="glyphicon glyphicon-unchecked"></span>
+                        Workwear mode
+        </a>
+    </span>
+
+ <small class="text-muted text-nowrap">
+            Current Budget
+          </small>
+          <small class="text-muted text-nowrap">
+            100.00 Pkt
+          </small>
+</div>
+
+                
+
+                
+                    <div class="oc-menu-account__select-item">
+                        <span class="oc-menu-account__select-item-label">
+                            Language
+                        </span>
+
+                        <div class="oc-menu-select oc-menu-account__select-item-select">
+                            <div class="oc-menu-select__dropdown-icon">
+                                <div class="oc-svg " style="fill: rgb(51, 51, 51);">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"
+                                         focusable="false">
+                                        <path d="M14 20l10 10 10-10z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <select class="oc-menu-select__select" onchange="
+    changeLanguageIfNotDirtyForm(this.value);
+"
+                                    name="lang">
+                                 <option  value="de">Deutsch</option> <option selected value="en">English</option> <option  value="ru">Русский</option> <option  value="fi">Suomi</option> <option  value="no">Norsk</option> <option  value="sv">Svenska</option>
+                            </select>
+                        </div>
+                    </div>
+                
+            </div>
+        </div>
+    </div>
+
+    </div>
+</div>
+        
+    </div>
+</div>
+        </div>
+
+        <div class="oc-menu__middle-col-bottom-row">
+            
+                <div class="oc-menu__hamburger-button">
+    <div class="oc-menu-icon">
+        <div class="oc-menu-icon__container">
+            <div class="oc-titled-button oc-menu-icon__button oc-menu-icon__button--light-overlay">
+                <button class=" oc-button    oc-button--content-empty" tabindex="0" type="button">
+                    <div class="oc-button__content" style="flex-direction: row-reverse;">
+                        <div class="oc-button__label"
+                             style="text-align: right; visibility: initial;">
+                            <div style="width: 0px;">&nbsp;</div>
+                        </div>
+
+                        <div class="oc-button__children" style="visibility: initial;">
+                            <div class="oc-svg-icon">
+                                <div class="oc-svg oc-svg-icon__svg">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" focusable="false">
+    <path d="M6 36h36v-4H6v4zm0-10h36v-4H6v4zm0-14v4h36v-4H6z"></path>
+</svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="main-menu" class="oc-menu__navigation-bar oc-menu__navigation-bar--hidden oc-menu-icon__sub-items-container--tablet-overlay-mode
+          oc-menu-icon__sub-items-container--tablet-overlay-mode-left">
+    <div class="oc-menu-icon__sub-items-container--tablet-overlay-header">
+  <div class="oc-menu-icon">
+    <div class="oc-menu-icon__container">
+      <div class="oc-titled-button oc-menu-icon__button oc-menu-icon__button--light-overlay">
+        <button class=" oc-button oc-button--content-empty" tabindex="0" type="button">
+          <div class="oc-button__content" style="flex-direction: row-reverse;">
+            <div class="oc-button__label" style="text-align: right; visibility: initial;">
+              <div style="width: 0px;">&nbsp;</div>
+            </div>
+
+            <div class="oc-button__children" style="visibility: initial;">
+              <div class="oc-svg-icon ">
+                <div class="oc-svg oc-svg-icon__svg">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" focusable="false">
+  <path d="M38 12.83L35.17 10 24 21.17 12.83 10 10 12.83 21.17 24 10 35.17 12.83 38 24 26.83 35.17 38 38 35.17 26.83 24z"></path>
+</svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+    <ul class="oc-navigation-bar oc-navigation-bar--vertical">
+        
+            
+                <li class="oc-navigation-bar__top-level-item oc-navigation-bar__top-level-item--vertical oc-navigation-bar__top-level-item--light-overlay ">
+                    <div class="oc-navigation-bar__top-level-clickable-item ">
+                        <div class="oc-navigation-bar__clickable-element-container">
+                            
+                                <a href="/opc/search/index"
+                                   class="oc-navigation-bar__clickable-element">
+                                    <div>
+                                        Search
+                                        
+
+    
+        <span class="badge btn-primary-bg"></span>
+    
+
+                                    </div>
+                                </a>
+                            
+                        </div>
+                    </div>
+
+                    
+                </li>
+            
+                <li class="oc-navigation-bar__top-level-item oc-navigation-bar__top-level-item--vertical oc-navigation-bar__top-level-item--light-overlay ">
+                    <div class="oc-navigation-bar__top-level-clickable-item ">
+                        <div class="oc-navigation-bar__clickable-element-container">
+                            
+                                <a href="/opc/externalShops/index"
+                                   class="oc-navigation-bar__clickable-element">
+                                    <div>
+                                        External Shops
+                                        
+
+    
+        <span class="badge btn-primary-bg"></span>
+    
+
+                                    </div>
+                                </a>
+                            
+                        </div>
+                    </div>
+
+                    
+                </li>
+            
+                <li class="oc-navigation-bar__top-level-item oc-navigation-bar__top-level-item--vertical oc-navigation-bar__top-level-item--light-overlay ">
+                    <div class="oc-navigation-bar__top-level-clickable-item ">
+                        <div class="oc-navigation-bar__clickable-element-container">
+                            
+                                <a href="/opc/browseContracts/index"
+                                   class="oc-navigation-bar__clickable-element">
+                                    <div>
+                                        Suppliers & Contracts
+                                        
+
+    
+        <span class="badge btn-primary-bg"></span>
+    
+
+                                    </div>
+                                </a>
+                            
+                        </div>
+                    </div>
+
+                    
+                </li>
+            
+        
+    </ul>
+</div>
+            
+        </div>
+    </div>
+</header>
+
+      <div class="container">
+        
+          
+          
+        
+        
+<script type="text/javascript">
+  var callbackConfirmProductDuplication;
+  var confirmProductDuplicationFunctionField;
+  var updateSpinner4ContractSelectionWindow;
+
+  function showConfirmProductDuplicationWindow(fieldId, isContractSelectionWindow, callback) {
+    var $confirmDialog = jQuery("#confirmProductDuplicationWindow");
+    callbackConfirmProductDuplication = callback;
+    confirmProductDuplicationFunctionField = fieldId;
+    updateSpinner4ContractSelectionWindow = isContractSelectionWindow;
+    jQuery("#confirmProductDuplicationWindow").bind('dialogclose', function(event){
+      if (event.originalEvent) {
+        if ('ui-dialog-titlebar-close ui-corner-all ui-state-hover' == event.originalEvent.currentTarget.className) {
+          updateSpinner();
+        }
+      }
+      jQuery("#selectedContractId").val("");
+    });
+    jQuery('#popupContainer').html($confirmDialog.children().clone(true)).modal();
+  }
+
+  function updateSpinner(){
+    var spinnerId = "spinner" + confirmProductDuplicationFunctionField.substring(0, confirmProductDuplicationFunctionField.lastIndexOf("_"));
+    spinnerId += updateSpinner4ContractSelectionWindow == true ? "Contract" : "";
+  }
+
+  function confirmProductDuplicationWindow(selectedItemValue) {
+    jQuery(document.getElementById(confirmProductDuplicationFunctionField)).val(selectedItemValue);
+    callbackConfirmProductDuplication();
+    removeDialog();
+  }
+
+  function cancelProductDuplicationWindow() {
+    updateSpinner();
+  }
+</script>
+
+<div id="confirmProductDuplicationWindow" style="display: none;">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+        <h4 class="modal-title">Duplicated Item</h4>
+      </div>
+
+      <div class="modal-body">
+        <p>This product is already present in your cart. How would you like to proceed:</p>
+        <div class="btn-group">
+
+            <input type='button' id="addItem2Cart" value="Add one more item"
+                   class="btn btn-default" onclick="confirmProductDuplicationWindow('addItem2Cart')"/>
+
+            <input type='button' id="addItem2Exists" value="Add the quantity to the existing item"
+                   class="btn btn-default" onclick="confirmProductDuplicationWindow('addItem2Exists')"/>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+        
+<script type="text/javascript">
+  function showConfirmWindow(title, text, yesButtonCallback, noButtonCallback) {
+    var $confirmDialog = jQuery("#confirmDialog");
+    jQuery(".modal-title", $confirmDialog).text(title);
+    jQuery(".modal-body", $confirmDialog).html(text);
+
+    var $popupContainer = jQuery('#popupContainer');
+    $popupContainer.html($confirmDialog.children().clone(true));
+    jQuery(".noAction", $popupContainer).on("click", noButtonCallback);
+    jQuery(".yesAction", $popupContainer).on("click", yesButtonCallback);
+
+    $popupContainer.modal();
+  }
+</script>
+<div id="confirmDialog" style="display: none;">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+        <h4 class="modal-title"></h4>
+      </div>
+
+      <div class="modal-body"></div>
+
+      <div class="modal-footer">
+        <button type="button" class="noAction btn btn-default" data-dismiss="modal">
+          No
+        </button>
+        <button type="button" class="yesAction btn btn-primary" data-dismiss="modal">
+          Yes
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+        <div id="similarProductCheckWindow" style="display:none"></div>
+
+        <div id="contractSelectionWindow" style="display:none"></div>
+        
+<div id="searchNotValid" class="error">
+  
+  
+  
+</div>
+
+          
+
+
+
+  
+
+
+  
+
+
+
+
+
+
+
+<form action="/opc/checkout/confirm" method="post" >
+  
+  
+
+  <div>
+    
+    
+    
+
+    
+      <div class="form-horizontal">
+        <script type="text/javascript">
+  $(function () {
+    retrieveApprovalChain("1636");
+  });
+
+  function retrieveApprovalChain(salesOrderKey) {
+    var spinner = "spinnerRetrievingApprovalChain";
+    $.ajax({
+      type: 'POST',
+      url: '/opc/checkout/retrieveApprovers',
+      data: {
+        salesOrderKey: salesOrderKey
+      },
+      beforeSend: function () {
+        showSpinner(spinner);
+      },
+      success: function (approverData) {
+// it is workaround fix for reverse requisition. when user submit order and press 'back button' in browser then he returned to checkout page
+// and this function is called by ajax. By since user has supplier assignment then OpcFilter do not allow to access checkout controller and retrieveApprovers action
+// as result incorrect page rendered in ".approval-chain" element
+          if (approverData.trim().indexOf('<div id="approverInfo">') == 0) {
+              $(".approval-chain").html(approverData);
+          }
+      },
+      complete: function () {
+        hideSpinner(spinner);
+      }
+    });
+  }
+</script>
+
+
+<h4>Expected Approval Chain</h4>
+
+<span id="spinnerRetrievingApprovalChain" class="spinner" style="display:none;">
+  <i class="fa fa-spinner fa-spin"></i>
+</span>
+
+<div class="approval-chain"></div>
+
+
+      </div>
+      <hr>
+    
+
+    
+    <div class="form-horizontal">
+      <div class="row">
+        <div class="col-md-3">
+          
+            
+
+<div id="deliveryAddress">
+  <h4>
+    
+      Delivery Address
+    
+  </h4>
+
+  <span id="deliveryAddressUpdate">
+    
+  </span>
+
+  <p>
+    
+    
+      Musterkunden AG
+      <br/>
+    
+    
+    
+      Lindemannstra&szlig;e 79
+      <br/>
+    
+    
+      44137&nbsp;/&nbsp;Dortmund
+      <br/>
+    
+    
+      
+      
+        
+        
+          DE - Germany
+          <br/>
+        
+      
+
+    
+      
+    
+  </p>
+</div>
+          
+        </div>
+
+        
+          
+          
+            <div class="col-md-3">
+              <h4>
+  
+    Recipient
+  
+</h4>
+
+
+<p>
+  
+    Peter Bedarf
+    <br/>
+  
+  
+    Geb&auml;ude 13
+    <br/>
+  
+  
+  
+    Etage 8
+    <br/>
+  
+  
+    Raum 12
+    <br/>
+  
+</p>
+
+            </div>
+          
+
+          <div class="col-md-3">
+            
+
+<div id="invoiceAddress">
+  <h4>
+    
+      Invoice Address
+    
+  </h4>
+
+  <span id="invoiceAddressUpdate">
+    
+  </span>
+
+  <p>
+    
+    
+      Musterkunden AG
+      <br/>
+    
+    
+    
+      Lindemannstra&szlig;e 79
+      <br/>
+    
+    
+      44137&nbsp;/&nbsp;Dortmund
+      <br/>
+    
+    
+      
+      
+        DE - Germany
+        <br/>
+      
+    
+  </p>
+</div>
+
+          </div>
+
+          
+            
+              <div class="col-md-3">
+                <div id="accountDetailsBlock">
+                  <h4>
+                    Accounting Details
+                  </h4>
+                  
+  
+  <div class="table-responsive">
+    <table class="resultTable table">
+      <thead>
+      <tr>
+        <th>
+          <nobr>
+            Type
+          </nobr>
+        </th>
+        <th>
+          Cost Object
+        </th>
+        <th>
+          %
+        </th>
+      </tr>
+      </thead>
+      <tbody>
+      
+        
+          <tr>
+            <td>
+              Cost Center
+            </td>
+            <td>
+              
+                Vertrieb
+                <br><span class="label label-default">K0123</span>
+              
+            </td>
+            <td>
+              100.00
+            </td>
+          </tr>
+        
+      
+      </tbody>
+    </table>
+  </div>
+
+                </div>
+              </div>
+            
+          
+          
+        
+      </div>
+    </div>
+  
+
+    
+
+    
+
+    
+    <div class="form-submit text-right">
+    <script>
+        function disableSalesOrderTemplateMode() {
+            $.ajax({
+                method: "POST",
+                url: "/opc/salesOrderMode/disableSalesOrderTemplate"
+            }).done(function () {
+                var templateModeButtons = $('.disable-template-mode');
+                if (templateModeButtons) {
+                    for (var i = 0; i < templateModeButtons.length; i++) {
+                        templateModeButtons[i].remove();
+                    }
+                }
+                var checkoutButtons = $('.checkout');
+                if (checkoutButtons) {
+                    for (var j = 0; j < checkoutButtons.length; j++) {
+                        checkoutButtons[j].value = "Place an Order";
+                    }
+                }
+            });
+        }
+    </script>
+    <a href="/opc/shoppingCart/index" class="btn btn-link">
+        Back to Cart
+    </a>
+    
+
+    
+    
+        <input type="submit" id="checkout" name="checkout" class="btn btn-primary dblclick_hack checkout" value="Place an Order" />
+    
+</div>
+
+    <script>
+  function submitSplitCart(button, spinner, shoppingCartName, itemKeys) {
+    // Check is button enable
+    if (!$(button).is('[disabled]')) {
+      // Disable button
+      $(button).attr('disabled', true).css({'pointer-events': 'none'});
+      $(button).parent().css({'cursor': 'not-allowed'});
+    }
+
+    showSpinner(spinner);
+
+    $.ajax({
+      type: 'POST',
+      url: '/opc/checkout/confirmSplitCart',
+      data: {shoppingCartName: shoppingCartName, itemKeys: itemKeys},
+      success: function (data) {
+        var escapedShoppingCartName = shoppingCartName.replace(/([ #;&,.+*~\':"!^$[\]()=>|\/@])/g, "\\$1");
+        var splitShoppingCartSelector = $("#shopping-cart-container-" + escapedShoppingCartName);
+
+        if (data.success) {
+          // find all split carts
+          var availableSplitCarts = splitShoppingCartSelector.parent().find('div[id^="shopping-cart-container-"]');
+          // need to sub 1 because we submit Cart from splitShoppingCartSelector
+          var splitCartsCount = availableSplitCarts.length - 1;
+
+          // if there is only one cart, need to hide block with submit split cart
+          if (splitCartsCount == 1) {
+            availableSplitCarts.find(".form-submit.text-right").remove();
+          }
+
+          if (data.infoMsg) {
+            // remove section after submit split cart
+            splitShoppingCartSelector.replaceWith('<div class="bs-callout bs-callout-info">' +
+                '<button type="button" class="close" data-dismiss="alert">' +
+                '<span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>' + data.infoMsg + '</div>');
+          } else {
+            splitShoppingCartSelector.remove();
+          }
+
+        } else if (data.errors) {
+          $(button).attr('disabled', false).css({'pointer-events': ''});
+          $(button).parent().css({'cursor': ''});
+          hideSpinner(spinner);
+
+          if (data.errors.length == 1) {
+            splitShoppingCartSelector.replaceWith('<div class="bs-callout bs-callout-danger"><p>' + data.errors[0] + '</p></div>');
+          } else {
+            var errors = '';
+            for (var i = 0; i < data.errors.length; i++) {
+              errors += ('<li>' + data.errors[i] + '</li>');
+            }
+            splitShoppingCartSelector.replaceWith('<div class="bs-callout bs-callout-danger"><ul>' + errors + '</ul></div>');
+          }
+        }
+        refreshCartInfo(null);
+      }
+    });
+  }
+</script>
+
+
+  <div id="shopping-cart-container-Cart(2018-07-05)">
+    
+    <input type="hidden" name="shoppingCartName_0" value="Cart(2018-07-05)" id="shoppingCartName_0" />
+    <input type="hidden" name="itemKeys_0" value="1859,1863" id="itemKeys_0" />
+
+    <h2>
+      Cart(2018-07-05)
+      
+        
+      
+    </h2>
+
+    
+<div class="table-responsive">
+  <table class="table search-results shopping-cart table-vertical-align-top">
+    <tbody>
+    
+    
+    
+      
+      
+      
+      
+      
+      
+      
+    
+    
+      
+
+      
+      <tr class="cart-item ">
+        <td class="select">
+          
+        </td>
+        <td class="product-image" style="position: relative;">
+          
+          
+          
+          
+            
+              
+                <a href="/opc/shoppingCart/productDetails/1859" class="product-detail-link product-image">
+                  <img src="https://p2p.opuscapita.com/opc/workarea/suppliers/hard001/documents/notebooks/910-001246.jpg?timestamp=1521703892000" alt="Product Thumbnail" class="img-responsive"/>
+                </a>
+              
+            
+          
+        </td>
+        <td class="product-shortdesc product-desc">
+          
+          
+            
+              <a href="/opc/shoppingCart/productDetails/1859" class="product-detail-link">
+                <h4>
+                  USB Mouse
+                  <br/>
+                  <small>
+                    
+                      Hardware AG (hard001)
+                    
+                    
+                  </small>
+                </h4>
+              </a>
+            
+          
+          <dl>
+            <dt>Product ID</dt><dd>
+            910-001246</dd><br>
+          </dl><br/>
+          
+          
+          
+          
+            <span class="label label-default">Delivery due: 07/05/2018</span>
+          
+        </td>
+        <td class="product-price">
+          <table class="price">
+            <tbody>
+            <tr>
+              <td>
+                <script type="text/javascript">
+                  jQuery(document).ready(function () {
+                    createSelectTextInputContentOnFocusEventHandler(jQuery(document.getElementById("quantity1859")));
+                  });
+                </script>
+                
+                
+                  
+  
+  
+  
+  
+  
+  
+
+
+
+
+
+
+
+<h4>
+  
+    
+      
+
+      <a href="javascript: void(0);" id="priceInfoPopupLink_lap001_910-001246" class="unlockable priceInfoPopupLink"
+              title="Price Info"
+              onclick="showPopupContainerDialog('/opc/priceInfo/show?quantityInputId=&productKey=lap001_910-001246&isInlineMode=', 'pricePopupContainer');">
+    
+    
+      
+      6.10&nbsp;EUR
+    
+
+    <br>
+
+    
+      
+    
+
+    
+
+    
+    
+
+    
+
+    
+      
+    
+    
+      </a>
+    
+  
+
+  
+  
+</h4>
+
+
+                
+              </td>
+              
+              <td class="form">
+                <div class="add-to-cart-container pull-left">
+                  <div class="input-group add-to-cart clearfix pull-left">
+                    <input type="text" id="quantity1859" name="quantity1859" maxlength="12" value="1" class="form-control input-sm add-to-cart-input" readonly="readonly" />
+                    <span class="input-group-addon input-uom">
+                      piece
+                    </span>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <!-- Total Price -->
+                <h4 class="price position-price text-nowrap">
+                  
+                  6.10&nbsp;EUR
+                </h4>
+                
+                
+              </td>
+            </tr>
+            </tbody>
+          </table>
+          
+            
+              
+
+  
+
+
+  
+
+
+<table class="table-dl pull-right full-width">
+  <tbody>
+  
+  
+    <tr>
+      <td class="dt">
+    
+        GL Account / Tax:
+    
+</td>
+<td class="dd">
+    
+        <span class="text-nowrap" style="color:#777;">
+            
+                25468975 /
+                
+                    <span class="label label-default"
+                          style="font-size: 85%;">undefined</span>
+                
+            
+        </span>
+    
+</td>
+      <td class="dt">
+        
+          Recipient:
+        
+      </td>
+      <td class="dd">
+        
+          
+            <span class="" style="color:#777;">
+              Peter Bedarf
+            </span>
+          
+        
+      </td>
+    </tr>
+  
+
+  <tr>
+    <td class="dt text-nowrap">
+      
+        Accounting Details:
+      
+    </td>
+    <td class="dd">
+      
+        
+        
+          
+            
+            <span style="color:#777;">
+              Cost Center&nbsp;(K0123)
+            </span>
+            
+          
+        
+      
+    </td>
+
+    <td class="dt">
+      
+        Order Text:
+      
+    </td>
+    <td class="dd">
+      
+        
+          <span class="label label-default" style="font-size: 70%;">
+            undefined
+          </span>
+        
+      
+    </td>
+  </tr>
+
+  <tr>
+    <td class="dt text-nowrap">
+      
+        Delivery Address:
+      
+    </td>
+    <td class="dd">
+      
+        
+          <span style="color:#777;">
+            Musterkunden AG
+          </span>
+        
+      
+    </td>
+    
+      <td class="dt text-nowrap">
+        Internal Notes:
+      </td>
+      <td class="dd">
+          
+            <span class="label label-default" style="font-size: 70%;">undefined</span>
+          
+      </td>
+    
+  </tr>
+  
+  
+    <tr>
+      
+        
+          <td class="dt">
+          </td>
+          <td class="dd">
+          </td>
+        
+      
+      
+<td class="dt">
+    
+        Documents:
+    
+</td>
+<td class="dd" style="">
+    
+        
+            <span class="label label-default" style="font-size: 70%;">
+                undefined
+            </span>
+        
+    
+</td>
+    </tr>
+  
+  
+  </tbody>
+</table>
+            
+          
+          
+        </td>
+      </tr>
+    
+    
+      
+    
+    
+    
+      <tr>
+        <td colspan="5">
+          <h3>Surcharges</h3>
+        </td>
+      </tr>
+    
+      
+        
+        
+        
+
+        <tr class="cart-item">
+          <td class="product-shortdesc product-desc" colspan="3">
+            <h4>
+              Extra surcharge in case order is less than 1000 EUR
+              <br/>
+              <small>
+                
+                
+                  Hardware AG (hard001)
+                
+              </small>
+            </h4>
+          </td>
+          <td class="product-price">
+            <table class="price">
+              <tbody>
+              <tr>
+                <td>
+                  
+  
+  
+  
+  
+  
+  
+
+
+
+
+
+
+
+<h4>
+  
+    
+      <span class=" unlockable" title="Price Info">
+    
+    
+      
+      25.00&nbsp;EUR
+    
+
+    <br>
+
+    
+      
+    
+
+    
+
+    
+    
+
+    
+
+    
+    
+      </span>
+    
+  
+
+  
+  
+</h4>
+
+
+                </td>
+                <td>
+                  <!-- Total Price -->
+                  <h4 class="price position-price text-nowrap">
+                    25.00&nbsp;EUR
+                  </h4>
+                </td>
+              </tr>
+              </tbody>
+            </table>
+            
+              
+<table class="table-dl pull-right full-width">
+  <tbody>
+  
+  
+    <tr>
+      <td class="dt">
+    
+        GL Account / Tax:
+    
+</td>
+<td class="dd">
+    
+        <span class="text-nowrap" style="color:#777;">
+            
+                25468975 /
+                
+                    <span class="label label-default"
+                          style="font-size: 85%;">undefined</span>
+                
+            
+        </span>
+    
+</td>
+    </tr>
+  
+  <tr>
+    <td class="dt">
+      Accounting Details:
+    </td>
+    <td class="dd">
+      
+      
+        
+          
+          <span style="color:#777;">
+            Cost Center&nbsp;(K0123)
+          </span>
+          
+        
+      
+    </td>
+  </tr>
+  </tbody>
+</table>
+            
+          </td>
+          <td></td>
+        </tr>
+        
+        
+        
+      
+    
+
+    <tr class="total">
+      <td class="text-right" colspan="4">
+        <h3>
+          <small>Total price:</small>
+
+          
+
+          31.10 EUR
+        </h3>
+      </td>
+    </tr>
+    </tbody>
+  </table>
+</div>
+
+  
+    
+  </div>
+
+
+
+
+
+
+  
+    <div class="form-submit text-right">
+    <script>
+        function disableSalesOrderTemplateMode() {
+            $.ajax({
+                method: "POST",
+                url: "/opc/salesOrderMode/disableSalesOrderTemplate"
+            }).done(function () {
+                var templateModeButtons = $('.disable-template-mode');
+                if (templateModeButtons) {
+                    for (var i = 0; i < templateModeButtons.length; i++) {
+                        templateModeButtons[i].remove();
+                    }
+                }
+                var checkoutButtons = $('.checkout');
+                if (checkoutButtons) {
+                    for (var j = 0; j < checkoutButtons.length; j++) {
+                        checkoutButtons[j].value = "Place an Order";
+                    }
+                }
+            });
+        }
+    </script>
+    <a href="/opc/shoppingCart/index" class="btn btn-link">
+        Back to Cart
+    </a>
+    
+
+    
+    
+        <input type="submit" id="checkout" name="checkout" class="btn btn-primary dblclick_hack checkout" value="Place an Order" />
+    
+</div>
+  </div>
+</form>
+<br/>
+
+<p>
+  May we help you? If there are remaining open questions, please don't hesitate to visit our help pages or contact us. What will happen if I place my order now? Your requisition will be redirected to your approver who will confirm your order or cancel it. What can I do when I made a mistake in my order? You are able to correct errors in your order by following the instructions hereafter: [...] Your bought product and services underlie a refundment period of XX days. You can return or reclaim them to us with a money-back guarantee! Please learn more relevant information related to this topic from our Return Policy.Go back to your Shopping Cart without confirmation.
+</p>
+
+
+        
+  
+
+  <style>
+    .compare-button-container {
+      background-color: rgba(255, 255, 255, 1);
+      border: 1px solid #eee;
+      box-shadow: 1px 2px 5px 0 rgba(0, 0, 0, 0.05);
+      padding: 5px;
+      position: fixed;
+      right: 15px;
+      bottom: 15px;
+      z-index: 1000;
+    }
+
+    .compare-button {
+      padding: 5px 8px;
+    }
+
+    .table > tbody > tr:first-child > td {
+      border-top: none;
+    }
+
+     .compare-product-list > tbody > tr > td {
+       vertical-align: inherit;
+     }
+
+    .scrollable-menu {
+      height: auto;
+      max-height: 500px;
+      min-width: 350px;
+      overflow-x: hidden;
+    }
+  </style>
+
+  <script type="text/javascript">
+    jQuery(function () {
+      getComparisonProductsCount('/opc/compare/getComparisonProductsCount');
+    });
+
+    function loadProductsFromCompareList() {
+      $('.compare-button-container .compare-products-preview-dropdown').load('/opc/compare/loadProductsFromCompareList');
+    }
+
+    jQuery(function ($) {
+      $('.dropdown-menu.compare-products-preview-dropdown').on('click', function (event) {
+        var events = $._data(document, 'events') || {};
+        events = events.click || [];
+        for (var i = 0; i < events.length; i++) {
+          if (events[i].selector) {
+
+            //Check if the clicked element matches the event selector
+            if ($(event.target).is(events[i].selector)) {
+              events[i].handler.call(event.target, event);
+            }
+
+            // Check if any of the clicked element parents matches the
+            // delegated event selector (Emulating propagation)
+            $(event.target).parents(events[i].selector).each(function () {
+              events[i].handler.call(this, event);
+            });
+          }
+        }
+        event.stopPropagation();
+      });
+    });
+
+  </script>
+
+  <div class="compare-button-container hide">
+    <div class="compare-button">
+      <!-- Split button -->
+      <div class="btn-group dropup">
+        <button name="mainCompareButton" type="button" class="btn btn-primary" onclick="disableDoubleClick(this);
+            compareSelectedProducts('/opc/compare/checkForSelectedItems', '/opc/compare/index');">
+          <span></span>
+        </button>
+
+        <span>
+          <button data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"
+                  onclick="loadProductsFromCompareList();"
+                  class="btn btn-default dropdown-toggle" type="button"><span class="caret"></span></button>
+          <ul class="dropdown-menu dropdown-menu-right scrollable-menu compare-products-preview-dropdown"/>
+        </span>
+      </div>
+      <button class="btn btn-default" onclick="disableDoubleClick(this);
+          clearComparisonProducts('Do you really want to clear products for comparison?',
+               '/opc/compare/clearComparisonProducts', '.compare-button-container');">
+        <span class="glyphicon glyphicon-trash"></span>
+      </button>
+    </div>
+  </div>
+
+      </div>
+    
+
+      
+        
+<footer>
+  <div class="container copyright text-center">
+    <a href="http://www.opuscapita.com/" target="_blank">
+      <img alt="App Logo" src="/opc/static/3iHTX1Ji1jT9cqjZ23fvYPZyygVAaYf37I6nm3MWwDA.svg"
+           style="height: 1.2em;">
+    </a>
+    <div id="footerMessageBuildVersion">
+      <small>
+        Online Product Catalog&nbsp;8.15.GA.4
+        
+        
+      </small>
+    </div>
+  &copy; 2000-2018&nbsp;<a href="http://www.opuscapita.com/" target="_blank">OpusCapita Software GmbH</a>
+  </div>
+</footer>
+      
+      
+
+    
+
+      <script src="/opc/static/PQWRnmpcu5GpQmzhOU6asvBnPLXSQS7gchBHx4qojzz.js" type="text/javascript" ></script>
+
+
+<script src="/opc/static/AzPj5DKHGzW7eTw2wMR6TNsSwZVWq3s55tHQQmGtvvS.js" type="text/javascript" media="screen, projection" ></script>
+<script src="/opc/static/5ESxUfDQNbCzyHVZKHGRxyEj4YGMcarwzkipshq7PsK.js" type="text/javascript" ></script>
+<script type="text/javascript">
+  // In case user entered some info on product details page and made an attempt to leave it, warning message with
+  // notification about unsaved changes appears. And if user tries to change language, setting language cookies
+  // should be postponed until user confirm leaving page.
+  function changeLanguageIfNotDirtyForm(language) {
+    if (jQuery.DirtyForms != null) {
+      if (!jQuery.DirtyForms.isDirty()) {
+  	    window.location.href='/opc?j_language=' + language;
+      } else {
+        // we use jQuery.DirtyForms plugin on product details page which does not handle 'window.location' javascript.
+        // A custom popup will not be shown in this case.
+			  // In IE it can cause exception additionally.
+        // So we have to check if there is any 'dirty' form we create link and emulate click
+        // on it to fire dirty form dialog.
+        var languageLink = jQuery("#changeLanguageLinkHack");
+        if (languageLink.size() == 0) {
+          languageLink = jQuery("<a id='changeLanguageLinkHack'></a>");
+          languageLink.appendTo(document.body);
+        }
+        languageLink.attr('href', '/opc?j_language=' + language);
+        languageLink.click();
+
+        jQuery(document).on({'decidingcontinued.dirtyforms':function () {
+            // place for code on user confirmation event
+        }});
+      }
+    } else {
+	    window.location.href='/opc?j_language=' + language;
+    }
+  }
+
+      $(function() {
+        var refreshUI = function() {
+          var badge = document.getElementById('1474cdff-ff60-4068-982d-999e86b72d32');
+          var expression = ["shoppingCartItemsCount"];
+          var res;
+          try {
+            res = eval(expression[0]);
+          } catch (e) {
+            console.error("Error evaluate expression '" +  expression[0] + "' in badge, please check it.", e);
+          }
+          if (res === null || res === undefined) {
+            badge.innerText = '';
+          } else {
+            badge.innerText = res;
+          }
+        };
+        //refresh by interval
+        setInterval(refreshUI, 1000);
+        //refresh immediately
+        refreshUI();
+      });
+    
+                    $(function() {
+                        var getHTML = function(menuItems) {
+                           var htmlPartials = [];
+                           for (var i = 0; i < menuItems.length; i++) {
+                             var menuItem = menuItems[i];
+                             if (menuItem.container === 'divider') {
+                               htmlPartials.push("<hr class=\"oc-notifications__divider\"/>");
+                             } else if (menuItem.container === 'header') {
+                               htmlPartials.push("<div class=\"oc-notifications__header\">" + menuItem.content + "</div>");
+                             } else if (menuItem.container === 'more') {
+                               htmlPartials.push("<div class=\"oc-notifications__more-container\">" + menuItem.content + "</div>");
+                             } else if (!menuItem.container || menuItem.container === 'default') {
+                               htmlPartials.push("<div class=\"oc-notification\">" + menuItem.content + "</div>");
+                             }
+                           }
+
+                           return htmlPartials.join('');
+                        };
+                        var expression = ["window.menuState.getMenuItems(this.event.id);"]
+                        var target = document.getElementById('9bbc8600-36cf-4c6f-a532-77f9e02ea1ae');
+                        var container = target.querySelector('.oc-notifications__items-container');
+
+                        var refreshUI = function(event) {
+                            var menuItems;
+                            try {
+                              menuItems = function() { return eval(expression[0]); }.call({event: event});
+                            } catch (e) {
+                              console.error("Error evaluate expression '" +  expression[0] + "' in icon menu", e);
+                            }
+
+                            if (menuItems === null || menuItems === undefined) {
+                              container.innerHTML = '';
+                            } else {
+                              container.innerHTML = getHTML(menuItems);
+                            }
+                        };
+
+                        var refreshUIRef = null;
+                        var id;
+
+                        var observer = new MutationObserver(function(mutations) {
+                          if (window.getComputedStyle(target).display !== 'none') {
+                            if (refreshUIRef === null) {
+                              id = new Date().getTime();
+                              //refresh by interval
+                              refreshUIRef = setInterval(refreshUI.bind(this, {id: id, trigger: 'refresh'}), 1000);
+                              //refresh immediately
+                              refreshUI({id: id, trigger: 'open'});
+                            }
+                          } else if(refreshUIRef !== null) {
+                            clearInterval(refreshUIRef);
+                            refreshUIRef = null;
+                            refreshUI({id: id, trigger: 'close'});
+                          }
+                        });
+                        observer.observe(target, {
+                          attributes: true
+                        });
+                    })
+                </script>
+
+      <div id="pricePopupContainer" class="modal fade" aria-hidden="true" role="dialog" tabindex="-1" style="z-index: 10000;"></div> 
+      <div id="popupContainer" class="modal fade" aria-hidden="true" role="dialog" tabindex="-1"></div> 
+      <div id="selectDefaultCostObjectContainer" class="modal fade" aria-hidden="true" role="dialog" tabindex="-1"></div> 
+      <div id="postBackContainer" style="display:none;"></div> 
+    </body>
+  </html>
