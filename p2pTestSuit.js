@@ -1,31 +1,64 @@
 const superagent = require('superagent')
-const {asyncForEach, asyncMap, wait} = require('./mylib')
+const {asyncMap, wait, retry} = require('./mylib')
 
-const rp = superagent.agent().redirects(20);
 
 const newAgent = () => superagent.agent().redirects(20);
 
-const request = superagent.agent().redirects(20)
-// var tough = require('tough-cookie');
 
 
 const eprocLogin = process.env.P2PLOGIN;
 const eprocPass  = process.env.P2PPASS;
+const stageAdminLogin = process.env.STAGEADMINLOGIN;
+const stageAdminPass  = process.env.STAGEADMINPASS;
+const stageSupplierLogin = process.env.STAGESUPPLIERLOGIN;
+const stageSupplierPass  = process.env.STAGESUPPLIERPASS;
 
+class AccessConfig {
+    constructor(init) {
+        this.scheme = init.scheme?init.scheme: 'https'
+        this.subdomain = init.subdomain?init.subdomain: 'stage.businessnetwork'
+        this.host = init.host?init.host: 'opuscapita.com'
+        this.port = init.port?init.port: 443
+        this.login = init.login?init.login: 'test' 
+        this.pass = init.pass?init.pass: 'test' 
+        this.language = init.language?init.language: 'en'
+    }
 
-var eproc = {
-    mask: 'https',
+    uri(append){
+        if (append && append[0] == '/') append = append.substring(1)
+        return `${this.scheme}://${this.subdomain}.${this.host}${![80,443].includes(this.port)?':'+this.port:''}/${append?append:''}`
+    }
+}
+
+var eproc = new AccessConfig({
+    scheme: 'https',
     subdomain: 'p2p',
     host: 'opuscapita.com',
     port: 443,
     login: eprocLogin,
     pass: eprocPass,
-    uri: function(append){
-        return `${this.mask}://${this.subdomain}.${this.host}${![80,443].includes(this.port)?':'+this.port:''}/${append?append:''}`
-    }
-}
+    language: 'en'
+})
 
+var stageAdmin = new AccessConfig({
+    scheme: 'https',
+    subdomain: 'stage.businessnetwork',
+    host: 'opuscapita.com',
+    port: 443,
+    login: stageAdminLogin,
+    pass: stageAdminPass,
+    language: 'en'
+})
 
+var stageSupplier = new AccessConfig({
+    scheme: 'https',
+    subdomain: 'stage.businessnetwork',
+    host: 'opuscapita.com',
+    port: 443,
+    login: stageSupplierLogin,
+    pass: stageSupplierPass,
+    language: 'en'
+})
 
 
 console.log(`
@@ -65,28 +98,8 @@ class CookieJar{
     }
 }
 
-var val1 = ''
-var val2 = ''
-var val3 = ''
-var val4 = ''
-var val5 = ''
-var val6 = ''
-var val7 = ''
-var val8 = ''
-var val9 = ''
-var html1 = ''
-var html2 = ''
-var html3 = ''
-var html4 = ''
-var html5 = ''
-var html6 = ''
-var html7 = ''
-var html8 = ''
-var html9 = ''
 
-var main = async () => {
-
-    // Retrive first page to get Sessions
+var createOrderEProc = async (eproc) => {
     var [j, SSOArtID] = await newAgent().
     get(eproc.uri('opc')).
     set('Connection', 'keep-alive').
@@ -115,7 +128,7 @@ var main = async () => {
     send('login-form_hf_0=').
     send('username=' + eproc.login).
     send('passwordFormGoup%3Apassword=' + eproc.pass).
-    send('language=en').
+    send('language=' + eproc.language).
     then(response => {
         console.log(' -> Authenticated\n')
 
@@ -218,7 +231,6 @@ var main = async () => {
 
 
 
-    // https://p2p.opuscapita.com/proc/orderAssignmentSecurity/checkCustomerAssignment?id=1672&onConfirm=%2FrequisitionStatus%2FshowDetails%2F1672%3Fuser%3DbnpTester%26sorting%3Dfalse%26isApprover%3D&objectType=salesOrder
     // Check customer assignment
     var answer = await eprocRegisteredRequest.
     get(eproc.uri('proc/orderAssignmentSecurity/checkCustomerAssignment')).
@@ -228,53 +240,39 @@ var main = async () => {
         objectType: 'salesOrder'
     }).
     then(response => {
-        var answer = response.res.text.toString();
+        var answer = JSON.parse(response.res.text.toString());
         console.log(` -> Assignment exist: ${answer.isValid}`);
-        return JSON.parse(answer);
+        return answer;
     })
 
     if (!answer.isValid) throw new Error(answer)
 
 
     // get POs - PO's appear on the page not immidiately, so it may require some time
-    await wait(3);
-    var uniquePOs = null
-    retriesLeft = 10
-    while (retriesLeft) {
-        try {
-            await wait(3);
-            uniquePOs = await eprocRegisteredRequest.
+    var uniquePOs = await retry(async () => {
+        return await eprocRegisteredRequest.
             get(eproc.uri('proc' + answer.onConfirm)).
             then(async (response) => {
                 var html = await response.res.text.toString()
                 var uniquePOs = html.match(/<a href="\/proc\/[^"]+">\r\n\s+(PO\d{9})\r\n\s+<\/a>/g).map(result => result.match(/PO\d{9}/)[0]).filter((v, i, a) => a.indexOf(v) === i);
 
-                console.log(` -> Got PO's ${uniquePOs.join(',')}`);
+                console.log(` -> Got POs ${uniquePOs.join(',')}`);
                 return uniquePOs
             })
-            retriesLeft = 0
-        } catch(e){
-            retriesLeft -= 1
-            console.log(`\n -> Ooops! Couldn't get POs. Tries left ${retriesLeft}\n`)
+    },
+        {
+            attempts:10,
+            waitBetween:3,
+            waitBefore:3
         }
-    }
+    )
     
-    if (uniquePOs == null) throw new Error('Unique POs are null')
+    if (!uniquePOs) throw new Error('Unique POs are null')
 
     // Get transferIds
-    await wait(15)
-    var transactionIds = null
-    retriesLeft = 10
-    
-
-    transactionIds = await asyncMap(uniquePOs, async (poId) => {
-        var transactionId = null
-        retriesLeft = 10
-
-        while (retriesLeft) {
-            try {
-                await wait(3);
-                var transactionId = await eprocRegisteredRequest.
+    var transactionIds = await asyncMap(uniquePOs, async (poId) => {
+        return await retry(async () => {
+            return await eprocRegisteredRequest.
                 get(eproc.uri('proc/docTransfer/list')).
                 query({
                     channel: 'erp',
@@ -298,22 +296,140 @@ var main = async () => {
                     return transactionId
                     //<\/td>\r\n\s+<td>  
                 })
-
-                return transactionId
-            } catch(e){
-                retriesLeft -=1
-                console.log(`\n -> Ooops! Couldn't get transactionIds. Tries left ${retriesLeft}\n`)
-            }
-        }
-        
-
+        }, {
+            attempts:10, 
+            waitBetween:4, 
+            waitBefore:15
+        })
     })
 
 
 
-    console.log(`\n\n -> FINISHED! requisitionId: ${requisitionId}, uniquePOs : ${uniquePOs.join(',')}, transactionIds: ${transactionIds.join(',')}`)
+    console.log(`\n\n -> FINISHED! requisitionId: ${requisitionId} , uniquePOs : ${uniquePOs.join(',')} , transactionIds: ${transactionIds.join(',')}`)
+    return [requisitionId, uniquePOs, transactionIds]
+}
+
+
+// (async () => await createOrderProc(eproc))()
+
+var checkTIDinTNT = async (stage, transactionId) => {
+    var answer = await stage.agent.get(stage.uri(`tnt/api/events/${transactionId}`)).then(response => response.body)
+    return answer[0];
+}
+
+var checkSalesOrderPO = async (stage, PO) => {
+    var {customerId, orderNumber} = await stage.agent.get(stage.uri(`sales-order/api/sales-orders/hard001?orderNumber=%${PO}%`)).then(response => response.body[0])
+
+    var answer = await stage.agent.get(stage.uri(`sales-order/api/sales-orders/hard001/${customerId}/${orderNumber}`))
+    .then(async (response) => await response.body)
+    return answer['salesOrder'];
+}
+
+var confirmPO = async (stage, POdata) => {
+    var update = {
+        type: 'orderConfirmation',
+        versionNumber: 'v2',
+        status: 'confirmed',
+        changedBy: 'BNP tester',
+        changedOn: (new Date()).toISOString(),
+    }
+
+    Object.assign(POdata, update)
+
+    var answer = await stage.agent.put(stage.uri(`sales-order/api/sales-orders/hard001/${POdata.customerId}/${POdata.orderNumber}`))
+    .set('Content-Type', 'application/json')
+    .send(JSON.stringify(POdata))
+    .then(response => response.body)
+    return answer['salesOrder'];
+}
+
+var loginStage = async (config) => {
+
+    console.log(' -> Starting Login ' + config.uri())
+    
+    var testcall = async (config, request) => {
+        var response = null;
+    
+        try {
+            response = await request.get('https://stage.businessnetwork.opuscapita.com/sales-order/api/sales-orders/hard001?orderNumber=%PO180000349%').redirects(10);
+            return true;
+        } catch(err) {
+            console.error("error in get testcall: ", err);
+            throw err;
+        }
+    }
+    
+    var logon = async (config, request) => {
+        let response = null;
+    
+        try {
+            response = await request.get(config.uri('bnp')).redirects(1).ok(res => res.status == 302);
+        }catch(err) {
+            console.error("error in get /bnp: ", err);
+            throw err;
+        }
+    
+        let interactionURL = response.headers.location;
+        console.log("interactionURL: ", interactionURL);
+    
+    
+        let interactionId = interactionURL.substring(interactionURL.lastIndexOf('/')+1, interactionURL.length);
+        console.log("interactionId: ", interactionId);
+    
+        try {
+            response = await request.post(config.uri(interactionURL + "/login"))
+                .send('uuid=' + interactionId)
+                .send('lang=' + config.languageId)
+                .send('login=' + config.login)
+                .send('password=' + config.pass)
+                .send('submit=Sign-in')
+                .redirects(10)
+            return request
+        }catch(err) {
+            console.error("error in POST " + config.uri(interactionURL + "/login: ") , err);
+            throw err;
+        }
+    
+    }
+
+    let agent = superagent.agent(); // to persist cookies across calls
+    var confirmed = await logon(config, agent)
+    .then( async () => {return await testcall(config, agent)} );
+
+
+    if (confirmed) return agent;
+    return false
+
+}
+
+
+var main = async () => {
+    // var [requisitionId, uniquePOs, transactionIds] = await createOrderEProc(eproc);
+    var [requisitionId, uniquePOs, transactionIds] = await createOrderEProc(eproc);
+
+    stageAdmin.agent = await loginStage(stageAdmin);
+    stageSupplier.agent = await loginStage(stageSupplier);
+
+    var tidinfo = await checkTIDinTNT(stageAdmin, transactionIds[0])
+
+    var POinfo = await retry(checkSalesOrderPO, 
+        {
+            options: [stageSupplier, uniquePOs[0]],
+            attempts: 10,
+            waitBetween: 3,
+            waitBefore: 8
+        }
+    )
+
+    var newSO = await confirmPO(stageSupplier, POinfo)
+
+    console.log(`requisitionId: `, requisitionId, `\n\n\n`)
+    console.log(`tidinfo: `, tidinfo, `\n\n\n`)
+    console.log(`POinfo: `, POinfo, `\n\n\n`)
+    console.log(`newSO: `, newSO , `\n\n\n`)
 
 }
 
 
 (async () => await main())()
+

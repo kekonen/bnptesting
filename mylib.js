@@ -28,4 +28,19 @@ var wait = async (seconds) => {
     return prom
 }
 
-module.exports = {asyncForEach, asyncMap, wait}
+var retry = async (func, {options = [], message = '', attemptsLeft=10, waitBetween=3, waitBefore=0}) => {
+    if (waitBefore) await wait(waitBefore)
+
+    while (attemptsLeft) {
+        try {
+            var result = await func(...options)
+            return result
+        } catch(e){
+            attemptsLeft -= 1
+            console.log(`\n -> Ooops! ${message}. Retries left ${attemptsLeft}\n`)
+            await wait(waitBetween);
+        }
+    }
+}
+
+module.exports = {asyncForEach, asyncMap, wait, retry}
