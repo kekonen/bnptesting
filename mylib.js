@@ -5,12 +5,16 @@ async function asyncForEach(array, callback) {
 }
 
 async function asyncMap(array, callback) {
-    var newArray = [];
-    for (let index = 0; index < array.length; index++) {
-        let newVal = await callback(array[index], index, array)
-        if (newVal) newArray.push(newVal)
+    try{
+        var newArray = [];
+        for (let index = 0; index < array.length; index++) {
+            let newVal = await callback(array[index], index, array)
+            if (newVal) newArray.push(newVal)
+        }
+        return newArray
+    } catch(e) {
+        throw e
     }
-    return newArray
 }
 
 var wait = async (seconds) => {
@@ -38,9 +42,34 @@ var retry = async (func, {options = [], message = '', attemptsLeft=10, waitBetwe
         } catch(e){
             attemptsLeft -= 1
             console.log(`\n -> Ooops! ${message}. Retries left ${attemptsLeft}\n`)
-            await wait(waitBetween);
+            if (attemptsLeft == 0) throw new Error(`Cycle ended`)
+            else await wait(waitBetween);
         }
     }
 }
 
-module.exports = {asyncForEach, asyncMap, wait, retry}
+var deepEqual = function (x, y) {
+    if (x === y) {
+        return true;
+    }
+    else if ((typeof x == "object" && x != null) && (typeof y == "object" && y != null)) {
+        if (Object.keys(x).length != Object.keys(y).length)
+            return false;
+  
+        for (var prop in x) {
+            if (y.hasOwnProperty(prop))
+            {  
+                if (! deepEqual(x[prop], y[prop]))
+                    return false;
+            }
+            else
+                return false;
+        }
+  
+        return true;
+    }
+    else 
+        return false;
+}
+
+module.exports = {asyncForEach, asyncMap, wait, retry, deepEqual}
