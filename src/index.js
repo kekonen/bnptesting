@@ -1,6 +1,6 @@
 const superagent = require('superagent')
 const assert = require('assert')
-const {asyncMap, wait, retry, deepEqual} = require('./mylib')
+const {asyncMap, wait, retry, deepEqual} = require('./lib/mylib')
 
 
 const newAgent = () => superagent.agent().redirects(20);

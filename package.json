@@ -2,13 +2,12 @@
   "name": "e2e-bnp-tests",
   "version": "1.0.0",
   "description": "E2E tests",
-  "main": "index.js",
+  "main": "src/index.js",
   "scripts": {
-    "p2p": "node p2pTestSuit.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js"
+    "start": "node src/index.js"
   },
-  "author": "",
+  "author": "Daniil Naumetc",
   "license": "ISC",
   "dependencies": {
     "bluebird": "^3.5.1",

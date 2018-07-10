@@ -1,3 +1,5 @@
 node_modules
 eproc.txt
 *.sh
+.env
+package-lock.json
