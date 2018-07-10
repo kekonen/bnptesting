@@ -5,16 +5,12 @@ async function asyncForEach(array, callback) {
 }
 
 async function asyncMap(array, callback) {
-    try{
-        var newArray = [];
-        for (let index = 0; index < array.length; index++) {
-            let newVal = await callback(array[index], index, array)
-            if (newVal) newArray.push(newVal)
-        }
-        return newArray
-    } catch(e) {
-        throw e
+    var newArray = [];
+    for (let index = 0; index < array.length; index++) {
+        let newVal = await callback(array[index], index, array)
+        if (newVal) newArray.push(newVal)
     }
+    return newArray
 }
 
 var wait = async (seconds) => {

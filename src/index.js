@@ -356,7 +356,7 @@ var createOrderEProc = async (eproc) => {
 
 
 
-    console.log(`\n\n -> FINISHED! requisitionId: ${requisitionId} , uniquePOs : ${uniquePOs.join(',')} , transactionIds: ${transactionIds.join(',')}`)
+    console.log(`\n\n -> Order creation finished! RequisitionId: ${requisitionId} , uniquePOs : ${uniquePOs.join(',')} , transactionIds: ${transactionIds.join(',')}\n\n`)
     return [requisitionId, uniquePOs, transactionIds]
 }
 
@@ -364,19 +364,26 @@ var createOrderEProc = async (eproc) => {
 // (async () => await createOrderProc(eproc))()
 
 var checkTIDinTNT = async (stage, transactionId) => {
+    console.log(` -> Checking TransactionId: '${transactionId}' \n`)
     var answer = await stage.agent.get(stage.uri(`tnt/api/events/${transactionId}`)).then(response => response.body)
-    return answer[0];
+
+    console.log(` -> Finished ... `)
+    return answer;
 }
 
 var checkSalesOrderPO = async (stage, PO) => {
+    console.log(` -> Checking received PO in BNP/SO: '${PO}'\n`)
     var {customerId, orderNumber} = await stage.agent.get(stage.uri(`sales-order/api/sales-orders/hard001?orderNumber=%${PO}%`)).then(response => response.body[0])
 
     var answer = await stage.agent.get(stage.uri(`sales-order/api/sales-orders/hard001/${customerId}/${orderNumber}`))
     .then(async (response) => await response.body)
+
+    console.log(` -> Finished ... `)
     return answer['salesOrder'];
 }
 
 var confirmPO = async (stage, POdata) => {
+    console.log(` -> Confirming PO: '${POdata.orderNumber}'`)
     var updatedPO = Object.assign({}, POdata)
     var update = {
         type: 'orderConfirmation',
@@ -392,6 +399,8 @@ var confirmPO = async (stage, POdata) => {
     .set('Content-Type', 'application/json')
     .send(JSON.stringify(updatedPO))
     .then(response => response.body)
+
+    console.log(` -> Finished ... `)
     return answer['salesOrder'];
 }
 
@@ -448,15 +457,8 @@ var loginStage = async (config) => {
 
 
 var main = async () => {
-    console.log(`////////////  Welcome to '${eproc.uri()}', login: '${eproc.login}', pass: '${eproc.pass}'\n\n\n`)
+    console.log(`\t\t\t\t  Welcome to '${eproc.uri()}', login: '${eproc.login}', pass: '${eproc.pass}'\n\n\n`)
 
-    // try {
-
-    // } catch(e){
-
-    // }
-
-    // var [requisitionId, uniquePOs, transactionIds] = await createOrderEProc(eproc);
     try{
         var [requisitionId, uniquePOs, transactionIds] = await createOrderEProc(eproc);
     } catch(e){
@@ -478,6 +480,7 @@ var main = async () => {
         throw e
     }
 
+    console.log(` -> Starting TransactionId check for '${transactionIds.join(', ')}' \n`)
     var TIDInfoResults = await asyncMap(transactionIds, transactionId => {
         try{
             return checkTIDinTNT(stageAdmin, transactionId)
@@ -490,15 +493,19 @@ var main = async () => {
     // Test TransactionIds
     TIDInfoResults.forEach(TIDInfo => {
         if ( // Add checks for SENT
-            TIDInfo.eventCode != 'RECEIVED' ||
-            TIDInfo.product != 'Sirius'
+            TIDInfo[0].eventCode != 'RECEIVED'  ||
+            TIDInfo[0].product != 'Sirius'      ||
+            TIDInfo[1].eventCode != 'SENT'      ||
+            TIDInfo[1].product != 'Andariel-Sirius-Bridge'
         ) throw new Error('TransactionId tests not passed!')
     })
+    console.log(` -> Successfuly tested TransactionIds' results \n`)
 
 
-    var POInfoResults = await asyncMap(uniquePOs, uniquePO => {
+    console.log(` -> Starting PO check for '${uniquePOs.join(', ')}' \n`)
+    var POInfoResults = await asyncMap(uniquePOs, async (uniquePO) => {
         try{
-            return retry(checkSalesOrderPO, 
+            return await retry(checkSalesOrderPO, 
                 {
                     options: [stageSupplier, uniquePO],
                     attempts: 10,
@@ -511,6 +518,8 @@ var main = async () => {
             throw e
         }
     })
+
+
     
     // Test uniquePOs
     POInfoResults.forEach(POInfo => {
@@ -521,8 +530,10 @@ var main = async () => {
             POInfo.status != 'ordered'
         ) throw new Error('PO result tests not passed!')
     })
+    console.log(` -> Successfuly tested uniquePOs' results \n`)
 
 
+    console.log(` -> Starting PO confirmation for tested POs \n`)
     var newPOInfoResults = await asyncMap(POInfoResults, POInfo => {
         try{
             return confirmPO(stageSupplier, POInfo)
@@ -540,6 +551,7 @@ var main = async () => {
         ) throw new Error(`Confirmed PO's tests failed!`)
     })
 
+
     
 
     var delVals = po => {
@@ -554,13 +566,18 @@ var main = async () => {
         if (!deepEqual(delVals(POInfoResults[i]), delVals(newPOInfo))) throw new Error(`PO and new PO are not equal`)
     })
 
+    console.log(` -> Successfuly tested New POs' results \n`)
+
+
     
 
-
+    console.log('\n\n\n ----> Test Success!\n\n');
     console.log(`requisitionId: `, requisitionId, `\n\n\n`)
     console.log(`TIDInfoResults: `, TIDInfoResults, `\n\n\n`)
     console.log(`POInfoResults: `, POInfoResults, `\n\n\n`)
     console.log(`newPOInfoResults: `, newPOInfoResults , `\n\n\n`)
+
+    
 
 }
 
