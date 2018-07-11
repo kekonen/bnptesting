@@ -7,12 +7,13 @@ const newAgent = () => superagent.agent().redirects(20);
 
 
 
-const eprocLogin = process.env.P2PLOGIN;
-const eprocPass  = process.env.P2PPASS;
-const stageAdminLogin = process.env.STAGEADMINLOGIN;
-const stageAdminPass  = process.env.STAGEADMINPASS;
-const stageSupplierLogin = process.env.STAGESUPPLIERLOGIN;
-const stageSupplierPass  = process.env.STAGESUPPLIERPASS;
+const eprocLogin =                  process.env.P2PLOGINDEV;
+const eprocPass  =                   process.env.P2PPASSDEV;
+const bnpAdminLogin =          process.env.BNPADMINLOGINDEV;
+const bnpAdminPass  =           process.env.BNPADMINPASSDEV;
+const bnpSupplierLogin =    process.env.BNPSUPPLIERLOGINDEV;
+const bnpSupplierPass  =     process.env.BNPSUPPLIERPASSDEV;
+
 
 class AccessConfig {
     constructor(init) {
@@ -20,6 +21,7 @@ class AccessConfig {
         this.subdomain = init.subdomain?init.subdomain: 'stage.businessnetwork'
         this.host = init.host?init.host: 'opuscapita.com'
         this.port = init.port?init.port: init.scheme=='https'?443:80
+        this.subfolder = init.subfolder?init.subfolder: ''
         this.login = init.login?init.login: 'test' 
         this.pass = init.pass?init.pass: 'test' 
         this.language = init.language?init.language: 'en'
@@ -27,29 +29,52 @@ class AccessConfig {
 
     uri(append){
         if (append && append[0] == '/') append = append.substring(1)
-        return `${this.scheme}://${this.subdomain}.${this.host}${![80,443].includes(this.port)?':'+this.port:''}/${append?append:''}`
+        return `${this.scheme}://${this.subdomain}.${this.host}${![80,443].includes(this.port)?':'+this.port:''}${this.subfolder?'/'+this.subfolder:''}/${append?append:''}`
     }
 }
 
+// var eproc = new AccessConfig({
+//     scheme: 'https',
+//     subdomain: 'p2p',
+//     login: eprocLogin,
+//     pass: eprocPass,
+// })
+
+// var bnpAdmin = new AccessConfig({
+//     scheme: 'https',
+//     subdomain: 'stage.businessnetwork',
+//     login: bnpAdminLogin,
+//     pass: bnpAdminPass,
+// })
+
+// var bnpSupplier = new AccessConfig({
+//     scheme: 'https',
+//     subdomain: 'stage.businessnetwork',
+//     login: bnpSupplierLogin,
+//     pass: bnpSupplierPass,
+// })
+
 var eproc = new AccessConfig({
-    scheme: 'https',
-    subdomain: 'p2p',
+    scheme: 'http',
+    subdomain: 'test',
+    host: 'jcatalog.com',
+    subfolder: 'dev-proc',
     login: eprocLogin,
     pass: eprocPass,
 })
 
-var stageAdmin = new AccessConfig({
+var bnpAdmin = new AccessConfig({
     scheme: 'https',
-    subdomain: 'stage.businessnetwork',
-    login: stageAdminLogin,
-    pass: stageAdminPass,
+    subdomain: 'develop.businessnetwork',
+    login: bnpAdminLogin,
+    pass: bnpAdminPass,
 })
 
-var stageSupplier = new AccessConfig({
+var bnpSupplier = new AccessConfig({
     scheme: 'https',
-    subdomain: 'stage.businessnetwork',
-    login: stageSupplierLogin,
-    pass: stageSupplierPass,
+    subdomain: 'develop.businessnetwork',
+    login: bnpSupplierLogin,
+    pass: bnpSupplierPass,
 })
 
 class CookieJar{
@@ -64,8 +89,10 @@ class CookieJar{
         if (typee == 'object') {
             if (Array.isArray(cookies)) {
                 cookies.forEach(cookie => {
-                    var [cookieName, cookieValue] = cookie.split('=')
-                    this.cookies[cookieName] = cookieValue
+                    if (cookie.match(/[A-Z_-][^=]+=[a-zA-Z0-9-\.]+/)) {
+                        var [cookieName, cookieValue] = cookie.split('=')
+                        this.cookies[cookieName] = cookieValue
+                    }
                 })
             } else {
                 Object.keys(cookies).forEach(cookieName => {
@@ -93,8 +120,10 @@ var createOrderEProc = async (eproc) => {
             var path = response.res.req.path
             const SSOArtID = path.substring(path.length-14,)
 
-            var preciousCookie = response.header['set-cookie'][0].substring(0,64);
+            var preciousCookie = response.header['set-cookie'][0];
             var restCookies = response.request.cookies.split(';');
+            console.log('1->', response.header['set-cookie'])
+            console.log('2->', restCookies)
 
             var j = new CookieJar(restCookies)
             j.add(preciousCookie)
@@ -456,7 +485,7 @@ var loginStage = async (config) => {
 }
 
 
-var main = async () => {
+var confirmation = async () => {
     console.log(`\t\t\t\t  Welcome to '${eproc.uri()}', login: '${eproc.login}', pass: '${eproc.pass}'\n\n\n`)
 
     try{
@@ -467,23 +496,23 @@ var main = async () => {
     }
 
     try{
-        stageAdmin.agent = await loginStage(stageAdmin);
+        bnpAdmin.agent = await loginStage(bnpAdmin);
     } catch(e){
-        console.error(`Couldn't login on stage as admin '${stageAdmin.login}'`, e)
+        console.error(`Couldn't login on stage as admin '${bnpAdmin.login}'`, e)
         throw e
     }
 
     try{
-        stageSupplier.agent = await loginStage(stageSupplier);
+        bnpSupplier.agent = await loginStage(bnpSupplier);
     } catch(e){
-        console.error(`Couldn't login on stage as supplier '${stageSupplier.login}'`, e)
+        console.error(`Couldn't login on stage as supplier '${bnpSupplier.login}'`, e)
         throw e
     }
 
     console.log(` -> Starting TransactionId check for '${transactionIds.join(', ')}' \n`)
     var TIDInfoResults = await asyncMap(transactionIds, transactionId => {
         try{
-            return checkTIDinTNT(stageAdmin, transactionId)
+            return checkTIDinTNT(bnpAdmin, transactionId)
         } catch(e){
             console.error(`Couldn't get TID info from stage`)
             throw e
@@ -507,7 +536,7 @@ var main = async () => {
         try{
             return await retry(checkSalesOrderPO, 
                 {
-                    options: [stageSupplier, uniquePO],
+                    options: [bnpSupplier, uniquePO],
                     attempts: 10,
                     waitBetween: 3,
                     waitBefore: 8
@@ -536,7 +565,7 @@ var main = async () => {
     console.log(` -> Starting PO confirmation for tested POs \n`)
     var newPOInfoResults = await asyncMap(POInfoResults, POInfo => {
         try{
-            return confirmPO(stageSupplier, POInfo)
+            return confirmPO(bnpSupplier, POInfo)
         } catch(e){
             console.error(`Couldn't confirm PO info from stage`)
             throw e
@@ -582,5 +611,132 @@ var main = async () => {
 }
 
 
-(async () => await main())()
+
+var changeCase = async () => {
+    console.log(`\t\t\t\t  Welcome to '${eproc.uri()}', login: '${eproc.login}', pass: '${eproc.pass}'\n\n\n`)
+
+    try{
+        var [requisitionId, uniquePOs, transactionIds] = await createOrderEProc(eproc);
+    } catch(e){
+        console.error(`Couldn't create an order:`, e)
+        throw e
+    }
+
+    try{
+        bnpAdmin.agent = await loginStage(bnpAdmin);
+    } catch(e){
+        console.error(`Couldn't login on stage as admin '${bnpAdmin.login}'`, e)
+        throw e
+    }
+
+    try{
+        bnpSupplier.agent = await loginStage(bnpSupplier);
+    } catch(e){
+        console.error(`Couldn't login on stage as supplier '${bnpSupplier.login}'`, e)
+        throw e
+    }
+
+    console.log(` -> Starting TransactionId check for '${transactionIds.join(', ')}' \n`)
+    var TIDInfoResults = await asyncMap(transactionIds, transactionId => {
+        try{
+            return checkTIDinTNT(bnpAdmin, transactionId)
+        } catch(e){
+            console.error(`Couldn't get TID info from stage`)
+            throw e
+        }
+    })
+
+    // Test TransactionIds
+    TIDInfoResults.forEach(TIDInfo => {
+        if ( // Add checks for SENT
+            TIDInfo[0].eventCode != 'RECEIVED'  ||
+            TIDInfo[0].product != 'Sirius'      ||
+            TIDInfo[1].eventCode != 'SENT'      ||
+            TIDInfo[1].product != 'Andariel-Sirius-Bridge'
+        ) throw new Error('TransactionId tests not passed!')
+    })
+    console.log(` -> Successfuly tested TransactionIds' results \n`)
+
+
+    console.log(` -> Starting PO check for '${uniquePOs.join(', ')}' \n`)
+    var POInfoResults = await asyncMap(uniquePOs, async (uniquePO) => {
+        try{
+            return await retry(checkSalesOrderPO, 
+                {
+                    options: [bnpSupplier, uniquePO],
+                    attempts: 10,
+                    waitBetween: 3,
+                    waitBefore: 8
+                }
+            )
+        } catch(e){
+            console.error(`Couldn't get POInfo info from stage`)
+            throw e
+        }
+    })
+
+
+    
+    // Test uniquePOs
+    POInfoResults.forEach(POInfo => {
+        if (
+            !uniquePOs.includes(POInfo.orderNumber) ||
+            POInfo.type != 'order'                  ||
+            POInfo.versionNumber != 'v1'            ||
+            POInfo.status != 'ordered'
+        ) throw new Error('PO result tests not passed!')
+    })
+    console.log(` -> Successfuly tested uniquePOs' results \n`)
+
+
+    console.log(` -> Starting PO confirmation for tested POs \n`)
+    var newPOInfoResults = await asyncMap(POInfoResults, POInfo => {
+        try{
+            return confirmPO(bnpSupplier, POInfo)
+        } catch(e){
+            console.error(`Couldn't confirm PO info from stage`)
+            throw e
+        }
+    })
+    
+    newPOInfoResults.forEach(newPOInfo => {
+        if (
+            newPOInfo.type != 'orderConfirmation'   ||
+            newPOInfo.versionNumber != 'v2'         ||
+            newPOInfo.status != 'confirmed'
+        ) throw new Error(`Confirmed PO's tests failed!`)
+    })
+
+
+    
+
+    var delVals = po => {
+        var r = Object.assign({}, po);
+        ['id', 'versionNumber', 'status', 'type', 'changedBy', 'changedOn'].forEach(k => delete r[k]);
+        r.SalesOrderItems.forEach(i => {delete i.id; delete i.salesOrderId});
+        return r
+    }
+
+    // Test new (confirmed) POs are corresponding to original POs
+    newPOInfoResults.forEach((newPOInfo, i) => {
+        if (!deepEqual(delVals(POInfoResults[i]), delVals(newPOInfo))) throw new Error(`PO and new PO are not equal`)
+    })
+
+    console.log(` -> Successfuly tested New POs' results \n`)
+
+
+    
+
+    console.log('\n\n\n ----> Test Success!\n\n');
+    console.log(`requisitionId: `, requisitionId, `\n\n\n`)
+    console.log(`TIDInfoResults: `, TIDInfoResults, `\n\n\n`)
+    console.log(`POInfoResults: `, POInfoResults, `\n\n\n`)
+    console.log(`newPOInfoResults: `, newPOInfoResults , `\n\n\n`)
+
+    
+
+}
+
+
+(async () => await changeCase())()
 

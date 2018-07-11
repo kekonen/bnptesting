@@ -3,3 +3,4 @@ eproc.txt
 *.sh
 .env
 package-lock.json
+.exp
