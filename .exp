@@ -1,0 +1,13 @@
+export P2PLOGINDEV=jcadmin
+export P2PPASSDEV=jcadmin
+export BNPADMINLOGINDEV=ocadmin
+export BNPADMINPASSDEV=test
+export BNPSUPPLIERLOGINDEV=scott.tiger@example.com
+export BNPSUPPLIERPASSDEV=test
+
+export P2PLOGIN=bnpTester
+export P2PPASS=bnp1337!
+export BNPADMINLOGIN=ocadmin
+export BNPADMINPASS=3l1ttleB1rdsS1tOnMyD00rstep
+export BNPSUPPLIERLOGIN=scott.tiger@example.com
+export BNPSUPPLIERPASS=test
